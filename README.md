@@ -55,6 +55,20 @@ If it does not load, the Wi-Fi is isolating devices (common on office and guest
 networks); use the phone's hotspot for the Mac instead, and allow incoming
 connections for `node` if macOS asks.
 
+**Public test URL on Vercel.** `vercel.json` builds every game and serves
+`site/`: an index page plus `/<game>/` for each built-out game (skeletons without
+a `TASKS.md` are skipped; see `scripts/build-site.sh`). One time, with your
+personal Vercel account:
+
+```sh
+npx vercel login
+npx vercel deploy --prod --yes   # first run creates the project and prints the URL
+```
+
+Run the deploy command again to publish the latest code, or connect the GitHub
+repo to the project in the Vercel dashboard to deploy on every push. The deployed
+site is public to anyone with the URL even though the repo is private.
+
 **GitHub Pages is off.** Pages needs a public repo on the free plan, so
 `pages.yml` is manual-only. To switch it on later, make the repo public, set
 **Settings → Pages → Source: GitHub Actions**, and restore the `push` trigger
