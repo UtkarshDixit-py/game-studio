@@ -208,6 +208,35 @@ export const stepBall = (ball: Ball, course: Course, dt: number, flags: HoleFlag
   return events;
 };
 
+/** Result of rolling a shot to rest: the resting (or holed) ball and every event on the way. */
+export interface ShotSimulation {
+  ball: Ball;
+  events: BallEvent[];
+}
+
+/** Hard cap on steps for one simulated roll: the roll timeout plus a little slack. */
+const MAX_SIMULATION_STEPS = Math.ceil(MAX_ROLL_SECONDS / FIXED_DT) + 4;
+
+/**
+ * Rolls a ball that has just been shot (velocity already set, e.g. by
+ * `applyShot`) to rest or into the hole with the real fixed-step physics, and
+ * returns where it ended up plus every event along the way. Neither the
+ * caller's `ball` nor `flags` is touched: both are cloned first, so the AI can
+ * try many candidate shots against the same hole state.
+ */
+export const simulateShot = (ball: Ball, course: Course, flags: HoleFlags = freshHoleFlags()): ShotSimulation => {
+  const copy: Ball = { ...ball };
+  if (ball.shotOrigin) copy.shotOrigin = { x: ball.shotOrigin.x, y: ball.shotOrigin.y };
+  const flagsCopy: HoleFlags = { brokenProps: [...flags.brokenProps], collectedStars: [...flags.collectedStars] };
+  const events: BallEvent[] = [];
+  for (let i = 0; i < MAX_SIMULATION_STEPS; i++) {
+    if (copy.holed || isAtRest(copy, course)) break;
+    const stepEvents = stepBall(copy, course, FIXED_DT, flagsCopy);
+    for (const event of stepEvents) events.push(event);
+  }
+  return { ball: copy, events };
+};
+
 /**
  * Portal handling for one step. A ball that just came out of a portal is
  * locked until its centre is outside every portal; after that, entering a

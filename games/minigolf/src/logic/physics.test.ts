@@ -5,6 +5,7 @@ import {
   DOWN_CONVEYOR_COURT_BELT,
   PING_PONG_COURT_BELTS,
   PING_PONG_COURT_UP,
+  PROP_COURT_PROP,
   SAND_COURT_STRIP,
   WALL_COURT_WALL,
   WATER_COURT_POND,
@@ -12,6 +13,7 @@ import {
   downConveyorCourt,
   openCourt,
   pingPongCourt,
+  propCourt,
   sandCourt,
   wallCourt,
   waterCourt,
@@ -26,12 +28,15 @@ import {
   MAX_ROLL_SECONDS,
   WALL_RESTITUTION,
   conveyorAt,
+  freshHoleFlags,
   isAtRest,
   isInSand,
   isInWater,
+  simulateShot,
   stepBall,
   type Ball,
   type BallEvent,
+  type HoleFlags,
 } from './physics';
 import { MAX_SHOT_SPEED, applyShot } from './shot';
 
@@ -605,5 +610,77 @@ describe('physics: water, conveyors and the roll timeout', () => {
     expect(Object.is(a.vx, b.vx)).toBe(true);
     expect(Object.is(a.vy, b.vy)).toBe(true);
     expect(a.rollTime).toBe(b.rollTime);
+  });
+});
+
+describe('simulateShot', () => {
+  it('rolls a shot to rest and matches stepping by hand, without touching the caller ball or flags', () => {
+    const course = propCourt();
+    const tee = rectCentre(course.start);
+    const shot = applyShot({ x: tee.x, y: tee.y, vx: 0, vy: 0 }, { angle: -Math.PI / 2 + 0.05, power: 1 });
+    const original = JSON.parse(JSON.stringify(shot)) as Ball;
+    const flags: HoleFlags = freshHoleFlags();
+
+    const result = simulateShot(shot, course, flags);
+
+    expect(shot).toEqual(original);
+    expect(flags).toEqual(freshHoleFlags());
+    expect(result.ball).not.toBe(shot);
+    expect(isAtRest(result.ball, course)).toBe(true);
+    expect(result.events).not.toContain('timeout');
+
+    const manual = JSON.parse(JSON.stringify(original)) as Ball;
+    const manualFlags: HoleFlags = freshHoleFlags();
+    const manualEvents: BallEvent[] = [];
+    while (!manual.holed && !isAtRest(manual, course)) manualEvents.push(...stepBall(manual, course, FIXED_DT, manualFlags));
+    expect(result.ball).toEqual(manual);
+    expect(result.events).toEqual(manualEvents);
+  });
+
+  it('reports a broken prop in the events and the returned flags only, never the caller flags', () => {
+    const course = propCourt();
+    const prop = PROP_COURT_PROP.rect;
+    const ball = applyShot({ x: 100, y: prop.y + prop.h / 2, vx: 0, vy: 0 }, { angle: 0, power: 0.6 });
+    const flags = freshHoleFlags();
+    const result = simulateShot(ball, course, flags);
+    expect(result.events).toContain('break');
+    expect(flags.brokenProps).toEqual([]);
+    expect(ball.x).toBe(100);
+  });
+
+  it('a holed shot ends with holed set and one "holed" event', () => {
+    const course = openCourt();
+    const tee = rectCentre(course.start);
+    const ball = applyShot({ x: tee.x, y: tee.y, vx: 0, vy: 0 }, { angle: -Math.PI / 2, power: 350 / MAX_SHOT_SPEED });
+    const result = simulateShot(ball, course);
+    expect(result.ball.holed).toBe(true);
+    expect(result.events.filter((e) => e === 'holed')).toHaveLength(1);
+    expect(ball.holed).toBeFalsy();
+  });
+
+  it('a shot into water ends back at the origin with one "water" event', () => {
+    const course = waterCourt();
+    const tee = rectCentre(course.start);
+    const ball = applyShot({ x: tee.x, y: tee.y, vx: 0, vy: 0 }, { angle: -Math.PI / 2, power: 300 / MAX_SHOT_SPEED });
+    const result = simulateShot(ball, course);
+    expect(result.events.filter((e) => e === 'water')).toHaveLength(1);
+    expect({ x: result.ball.x, y: result.ball.y }).toEqual(tee);
+    expect(isAtRest(result.ball, course)).toBe(true);
+  });
+
+  it('a ball that never settles stops at the roll timeout', () => {
+    const course = pingPongCourt();
+    const up = PING_PONG_COURT_UP.rect;
+    const ball: Ball = { x: up.x + up.w / 2, y: up.y + up.h / 2, vx: 0, vy: 0, rollTime: 0 };
+    const result = simulateShot(ball, course);
+    expect(result.events.filter((e) => e === 'timeout')).toHaveLength(1);
+    expect(isAtRest(result.ball, course)).toBe(true);
+    expect(result.ball.rollTime).toBeGreaterThanOrEqual(MAX_ROLL_SECONDS - 1e-9);
+  });
+
+  it('a ball already at rest returns immediately with no events', () => {
+    const result = simulateShot({ x: 50, y: 60, vx: 0, vy: 0 }, openCourt());
+    expect(result.events).toEqual([]);
+    expect(result.ball).toEqual({ x: 50, y: 60, vx: 0, vy: 0 });
   });
 });
