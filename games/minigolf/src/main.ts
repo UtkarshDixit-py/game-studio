@@ -1,4 +1,4 @@
 import { createGame } from '@studio/core/phaser';
-import { BootScene } from './scenes/BootScene';
+import { PlayScene } from './scenes/PlayScene';
 
-createGame({ scenes: [BootScene] });
+createGame({ scenes: [PlayScene] });
