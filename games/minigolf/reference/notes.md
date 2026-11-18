@@ -1,64 +1,110 @@
 # Mini golf reference notes (mechanics only)
 
-Source: 5 phone screenshots + 1 gameplay video in `screenshots/` (gitignored).
+Source: 5 phone screenshots and one 3m40s gameplay video in `screenshots/`
+(gitignored). The video shows three complete holes of a 1v1 match.
 Everything below describes mechanics and layout to copy. No names, art, sounds or
 text from the source are to be reused.
 
 ## Screen layout (portrait)
 
-- Top band: player 1 (left) and player 2 (right) with avatar, running score badge,
-  and `SHOT: n` for the current hole. A "your turn" pill and a turn timer bar sit
-  over the active player.
-- Course area: a tall rectangle with a thick wall border, roughly 1:1.4 aspect,
-  sits in the middle of the screen. Above it a banner shows `MAX SHOTS: n`
-  (per-hole shot cap: 4, 5 and 6 seen).
-- A tutorial overlay band appears across the middle on the first holes
-  ("place your ball on a starting area", "drag from the center of the screen to shoot").
+- Top band: the two players side by side, each with a running match score badge
+  and `SHOT: n` for the current hole. The active player gets a "your turn" pill
+  and a draining turn-timer bar.
+- Course: a tall rectangle with a thick wall border, about 1:1.4, in the middle
+  of the screen. A banner on its top edge shows `MAX SHOTS: n`.
+- The whole course is visible at once. No camera scrolling or zoom.
+- One-line tutorial bands appear over the course on the first hole.
 
-## Core loop
+## Turn flow (confirmed from video)
 
-1. **Place the ball.** The hole has a highlighted start zone (a small checkered
-   square, bottom-left on most holes). The player taps anywhere inside it to place
-   the ball. This is a real choice: placement affects the line.
-2. **Aim and shoot by dragging anywhere.** The drag starts from screen centre, not
-   from the ball. Drag direction and length set shot direction and power. A
-   pulsing ring on the start zone shows aim feedback. Release to shoot.
-3. Ball rolls with friction, bounces off walls, interacts with hazards, stops.
-4. Repeat until the ball is in the hole or the shot cap is reached.
-5. **Hole score panel**: a dark overlay listing each player's strokes for that hole.
-   Then the next hole.
+1. **Place the ball.** Each hole has one highlighted start zone (a small checkered
+   square). The player taps inside it to place the ball. Placement is a real
+   choice because it changes the first line.
+2. **Aim.** Touch down anywhere on screen. A grey dot marks the touch-down point.
+   Dragging away from it draws a white tapered aim line from the ball, with a
+   power percentage next to the ball (39%, 47%, 50%, 88% seen). Line length
+   scales with power. A pulsing ring surrounds the ball being aimed.
+3. **Release** to shoot. The ball rolls with friction, bounces off walls, and
+   stops. The shot counter goes up by one.
+4. Turns alternate between the two players, one shot each. Both balls stay on the
+   course. A "your turn" bubble points at the ball when control returns.
+5. The hole ends for a player when the ball drops, or when the shot cap is hit.
+   A player who holed out gets a tick next to the shot count. A player who ran
+   out of shots shows a dash instead of a number.
+6. **Hole score panel**: a dark band across the course listing each player's
+   points for that hole. Then the next hole loads.
 
-## Hazards and tiles seen
+Not determinable from the frames: whether the drag is pull-back (slingshot) or
+push-forward, and whether the two balls collide. Decide in SPEC.md. Pull-back is
+the common convention.
 
-- **Walls**: thick brick segments; inner walls form L-shapes, corridors and
-  partial boxes. Ball bounces.
-- **Water**: large blue blobs. Ball entering water resets (penalty) to its last
-  position or the start.
-- **Sand**: beige patches that slow the ball sharply.
-- **Conveyor strips**: bands of arrows (up, down, left, right). A ball on them is
-  pushed in the arrow direction. Used to make corridors one-way or to carry a ball
-  along a wall.
-- **Portals**: rainbow swirl pairs. Ball entering one exits the other keeping its
-  velocity.
-- **Bonus pickups**: a star token on a pink patch, collected by rolling over it.
-- Decorative props (buildings, animals, trees) are purely visual; our version uses
-  primitive shapes and must not copy them.
+## Scoring (confirmed from video)
 
-## Multiplayer
+- Match play, not stroke play. The player who holes out in fewer shots wins the
+  hole and gets 1 point. The loser gets 0. The badge shows the running total.
+- Per-hole shot caps seen: 5, 4, 6. Failing to hole out within the cap loses the hole.
 
-Source is 1v1 online turn-based with a turn timer. For our first version: single
-player versus par, with a local "pass the phone" 2-player mode as a later task.
-No real-money mechanics, no chat.
+## The three holes in the video
+
+1. **Open field, cap 5.** Start zone bottom-left. A big water blob in the centre
+   ringed with props. Hole top-right inside an L-shaped wall that opens upward,
+   so the ball has to come in from above. Teaches placement, power and water.
+2. **Portal and peg field, cap 4.** Three stacked bands separated by walls.
+   Bottom band has the start zone, a portal, sand and water. The portal carries
+   the ball to the top band. Between them is a field of staggered short wall
+   pegs laid over a downward conveyor, with a row of five holes at the bottom.
+   The ball is pushed down through the pegs and may need extra shots from inside
+   the field. Missing the portal wastes a shot in the bottom band.
+3. **Conveyor maze, cap 6.** Start zone at the bottom of a narrow left corridor.
+   A downward conveyor band sits just above the start, so the first shot needs
+   high power to get past it, then upward bands carry the ball on. Across the
+   top, then down the right side, and into a walled box in the centre holding
+   the hole, with sand beside it. Two vertical channels of rightward conveyors
+   push the ball sideways. A star pickup sits on a pink patch in the top-right.
+
+## Hazards and tiles
+
+- **Walls**: thick straight segments forming L-shapes, corridors, boxes and
+  short pegs. Ball bounces.
+- **Water**: large blobs. Ball entering water is reset with the shot counted.
+- **Sand**: patches that slow the ball sharply.
+- **Conveyors**: bands of arrows in four directions that push a ball resting or
+  rolling on them. Used for one-way corridors, for shots that need a minimum
+  power, and under the peg field.
+- **Portals**: matched pairs. Ball entering one leaves from the other.
+- **Breakable props**: decorative objects on the course act as obstacles and
+  break apart when the ball hits them, clearing the path for later shots.
+- **Star pickup**: collected by rolling over it. Its effect is not visible in
+  the video.
+- **Pink patches**: a surface type in hole 3. Its effect is not visible in the
+  video. A ball came to rest on one.
+
+## Design decisions for our version
+
+The source is online 1v1. We have no server, so pick one for SPEC.md:
+
+- **Solo vs par** (simplest): shot cap per hole, stars for finishing under par,
+  best total saved.
+- **Pass-and-play**: two players on one phone, alternate shots, match-play points
+  exactly as above.
+- **Solo vs a simple AI opponent**: keeps the match-play tension without a server.
+
+Suggested order: solo vs par first, pass-and-play as a later task since the
+turn logic is the same state machine with two balls.
 
 ## What to copy
 
-- Shot cap per hole instead of unlimited strokes.
-- Free placement inside a start zone.
-- Drag-anywhere aiming with a visible aim line and power indicator.
-- Hazard set: walls, water, sand, conveyor, portal, star pickup.
-- Score panel after each hole, total strokes at the end, best score saved.
+- Whole course on one screen, tall rectangle, thick border.
+- Tap-to-place inside a start zone.
+- Drag-anywhere aiming with tapered aim line and power percentage.
+- Per-hole shot cap shown on the course.
+- Hazard set: walls, water, sand, conveyors, portals, breakable obstacles, star pickups.
+- Hole design that teaches one idea each: open field, then portal plus peg
+  field, then conveyor maze.
+- Score band after each hole.
 
 ## What to avoid
 
-- Any names, logos, pixel-art props, avatar styles or UI chrome from the source.
-- Online multiplayer, accounts, chat, timers tied to a server.
+- Any names, logos, props, avatars, colours-as-branding or UI chrome from the source.
+- Online play, accounts, chat, server-driven timers.
+- Real-money mechanics of any kind.
