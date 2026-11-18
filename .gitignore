@@ -1,0 +1,15 @@
+node_modules/
+dist/
+site/
+test-results/
+playwright-report/
+.env
+.env.*
+.DS_Store
+
+# Third-party reference material stays local. Only README.md / notes.md are tracked.
+games/*/reference/**
+!games/*/reference/README.md
+!games/*/reference/notes.md
+!games/*/reference/screenshots/
+!games/*/reference/screenshots/.gitkeep

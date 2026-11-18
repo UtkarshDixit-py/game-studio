@@ -1,0 +1,65 @@
+name: pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Assemble site/<game>/ with an index page
+        run: |
+          set -euo pipefail
+          rm -rf site && mkdir -p site
+          {
+            echo '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+            echo '<meta name="viewport" content="width=device-width, initial-scale=1">'
+            echo '<title>Game Studio</title>'
+            echo '<style>body{font-family:sans-serif;background:#111;color:#eee;margin:0;padding:24px}'
+            echo 'a{display:block;padding:20px;margin:12px 0;background:#2563eb;color:#fff;border-radius:12px;'
+            echo 'text-decoration:none;font-size:22px;font-weight:bold;text-align:center}</style></head><body>'
+            echo "<h1>Game Studio</h1><p>Build $(git rev-parse --short HEAD) &middot; $(date -u +%Y-%m-%d\ %H:%M) UTC</p>"
+            for dir in games/*/; do
+              name="$(basename "$dir")"
+              if [ -d "$dir/dist" ]; then
+                mkdir -p "site/$name"
+                cp -R "$dir/dist/." "site/$name/"
+                echo "<a href=\"./$name/\">$name</a>"
+              fi
+            done
+            echo '</body></html>'
+          } > site/index.html
+          touch site/.nojekyll
+          ls -R site | head -50
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
