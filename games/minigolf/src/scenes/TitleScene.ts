@@ -3,6 +3,7 @@ import { BigButton, DESIGN_HEIGHT, DESIGN_WIDTH } from '@studio/core/phaser';
 import { GAME_TITLE } from '../logic/config';
 import { createMinigolfSave, formatRecord, isResumableMatch } from '../logic/save';
 import type { PlaySceneData } from './PlayScene';
+import { applyMute, muteLabel, synth, toggleMute } from './sound';
 
 const FONT = 'sans-serif';
 
@@ -13,6 +14,7 @@ const COLOURS = {
   accent: 0x4ade80,
   play: 0x3b82f6,
   resume: 0x16a34a,
+  panel: 0x1c1f24,
 };
 
 /** True when the URL carries a test jump (`?hole=` or `?seed=`). */
@@ -22,9 +24,10 @@ const urlJumpsToPlay = (): boolean => {
 };
 
 /**
- * Title: game name, lifetime record and the Play / Continue buttons. Reads the
- * save once on create; the Continue button only exists when a match can be
- * resumed. `?hole=` or `?seed=` in the URL skips straight to `Play`.
+ * Title: game name, lifetime record, the Play / Continue buttons and the mute
+ * toggle. Reads the save once on create; the Continue button only exists when
+ * a match can be resumed. `?hole=` or `?seed=` in the URL skips straight to
+ * `Play`.
  */
 export class TitleScene extends Phaser.Scene {
   constructor() {
@@ -41,8 +44,21 @@ export class TitleScene extends Phaser.Scene {
     const save = createMinigolfSave();
     const data = save.get();
     const resumable = isResumableMatch(data.inProgress) ? data.inProgress : null;
+    const muted = applyMute(save);
+
+    // Browsers only allow audio after a user gesture: the first touch is it.
+    this.input.once(Phaser.Input.Events.POINTER_DOWN, () => synth.unlock());
 
     const cx = DESIGN_WIDTH / 2;
+
+    // Mute toggle, top-right, out of the way of the big buttons.
+    const muteButton = new BigButton(this, DESIGN_WIDTH - 60, 48, {
+      label: muteLabel(muted),
+      width: 96,
+      height: 56,
+      color: COLOURS.panel,
+      onTap: () => muteButton.setLabel(muteLabel(toggleMute(save))),
+    }).setName('muteButton');
 
     // Decorative "hole" behind the name.
     this.add.circle(cx, 230, 92, 0x1c1f24).setStrokeStyle(4, COLOURS.accent, 1);

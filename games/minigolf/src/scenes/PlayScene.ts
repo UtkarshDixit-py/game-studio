@@ -14,10 +14,11 @@ import {
   type PlayerResult,
 } from '../logic/match';
 import { createAiOpponent, type Opponent } from '../logic/opponent';
-import { BALL_RADIUS, FIXED_DT, isAtRest, type Ball, type HoleFlags } from '../logic/physics';
+import { BALL_RADIUS, FIXED_DT, isAtRest, type Ball, type BallEvent, type HoleFlags } from '../logic/physics';
 import { createMinigolfSave, recordResult, type MinigolfSaveStore } from '../logic/save';
 import { shotFromDrag, type Shot } from '../logic/shot';
 import { CourseView } from './CourseView';
+import { applyMute, holeSting, matchSting, muteLabel, playTones, shotTone, synth, toggleMute, tonesForEvent } from './sound';
 
 /** Scene data for `Play`: pass `resume` to pick up a saved match. */
 export interface PlaySceneData {
@@ -36,6 +37,14 @@ const AI_THINK_DELAY_MS = 600;
 const AI_AIM_SHOW_MS = 500;
 /** Seed used when the URL has no valid `?seed=`. */
 const DEFAULT_SEED = 1;
+/** Minimum gap between two wall taps so a rattling ball does not spam, ms. */
+const WALL_TAP_GAP_MS = 70;
+/** Length of the squash-and-fade when a ball drops into the cup, ms. */
+const HOLE_SQUASH_MS = 260;
+/** Length of the hint band fade after the first shot, ms. */
+const HINT_FADE_MS = 700;
+/** Screen y above which the turn pointer flips below the ball (HUD + margin). */
+const POINTER_FLIP_Y = 210;
 
 const PLAYERS: readonly Player[] = [0, 1];
 const PLAYER_NAMES: readonly [string, string] = ['YOU', 'BOT'];
@@ -47,6 +56,9 @@ const COLOURS = {
   ball1Edge: 0xdfe6ea,
   aimDot: 0x9a9a9a,
   aimLine: 0xffffff,
+  aimRing: 0x4ade80,
+  pointer: 0xfacc15,
+  pointerText: '#0b0d10',
   card: 0x1c1f24,
   cardEdge: 0x565c66,
   cardActiveEdge: 0x4ade80,
@@ -61,8 +73,8 @@ const COLOURS = {
 
 const FONT = 'sans-serif';
 
-/** HUD card geometry: two cards side by side inside the 0–130 band. */
-const CARD = { y: 12, w: 224, h: 106, gap: 16 } as const;
+/** HUD card geometry: two cards at the screen edges with the mute button between. */
+const CARD = { y: 12, w: 190, h: 106, gap: 16 } as const;
 const cardX = (player: Player): number => (player === 0 ? CARD.gap / 2 : DESIGN_WIDTH - CARD.gap / 2 - CARD.w);
 
 /** Parses `?seed=` from the page URL, falling back to `DEFAULT_SEED`. */
@@ -96,6 +108,15 @@ interface PlayerCard {
   turn: Phaser.GameObjects.Text;
 }
 
+/** The "your turn" bubble: a pill with text and a triangle pointing at the ball. */
+interface TurnPointer {
+  root: Phaser.GameObjects.Container;
+  bob: Phaser.GameObjects.Container;
+  pill: Phaser.GameObjects.Rectangle;
+  label: Phaser.GameObjects.Text;
+  arrow: Phaser.GameObjects.Triangle;
+}
+
 /**
  * Thin scene: renders the course, both balls and the HUD, forwards touch input
  * to `match.ts`, advances the match physics in fixed slices and lets the AI
@@ -117,13 +138,23 @@ export class PlayScene extends Phaser.Scene {
   private rolling = false;
   /** True while a bot turn is scheduled or in progress. */
   private aiBusy = false;
+  /** Scene time of the last wall tap tone, for throttling. */
+  private lastWallTapAt = -Infinity;
+  /** Per player: true while the ball sprite is squashing into the cup. */
+  private holing: [boolean, boolean] = [false, false];
+  /** True once the hint band has faded (after the human's first settled shot). */
+  private hintDismissed = false;
 
   private courseView: CourseView | null = null;
   private ballSprites!: [Phaser.GameObjects.Arc, Phaser.GameObjects.Arc];
   private aimDot!: Phaser.GameObjects.Arc;
   private aimLine!: Phaser.GameObjects.Graphics;
+  private aimRing!: Phaser.GameObjects.Arc;
   private powerLabel!: Phaser.GameObjects.Text;
+  private turnPointer!: TurnPointer;
   private cards!: [PlayerCard, PlayerCard];
+  private muteButton!: BigButton;
+  private hintBg!: Phaser.GameObjects.Rectangle;
   private hintLabel!: Phaser.GameObjects.Text;
   private holeBand!: Phaser.GameObjects.Container;
   private holeBandLines!: [Phaser.GameObjects.Text, Phaser.GameObjects.Text];
@@ -146,6 +177,7 @@ export class PlayScene extends Phaser.Scene {
 
   create(): void {
     this.cameras.main.setBackgroundColor(COLOURS.background);
+    applyMute(this.save);
 
     // A resumed match is copied so the scene never mutates the save's object.
     this.state = this.resume
@@ -156,6 +188,9 @@ export class PlayScene extends Phaser.Scene {
     // Saves never hold a roll, but if one did, let `update` settle and save it.
     this.rolling = this.state.phase === 'rolling';
     this.aiBusy = false;
+    this.lastWallTapAt = -Infinity;
+    this.holing = [false, false];
+    this.hintDismissed = false;
     this.dragStart = null;
     this.pendingShot = null;
 
@@ -170,6 +205,7 @@ export class PlayScene extends Phaser.Scene {
       .setVisible(false);
     this.ballSprites = [ball0, ball1];
 
+    this.makeAimRing();
     this.aimDot = this.add.circle(0, 0, 6, COLOURS.aimDot).setName('aimDot').setDepth(20).setVisible(false);
     this.aimLine = this.add.graphics().setName('aimLine').setDepth(15).setVisible(false);
     this.powerLabel = this.add
@@ -178,8 +214,10 @@ export class PlayScene extends Phaser.Scene {
       .setName('powerLabel')
       .setDepth(20)
       .setVisible(false);
+    this.makeTurnPointer();
 
     this.cards = [this.makeCard(0), this.makeCard(1)];
+    this.makeMuteButton();
     this.makeHint();
     this.makeHoleBand();
     this.makeResultPanel();
@@ -208,12 +246,14 @@ export class PlayScene extends Phaser.Scene {
     }
     this.accumulator += Math.min(deltaMs / 1000, MAX_FRAME_DT);
     let stepped = false;
+    const events: BallEvent[] = [];
     while (this.accumulator >= FIXED_DT && this.state.phase === 'rolling') {
-      stepMatch(this.state, this.course, FIXED_DT);
+      events.push(...stepMatch(this.state, this.course, FIXED_DT));
       this.accumulator -= FIXED_DT;
       stepped = true;
     }
     if (stepped) {
+      this.playEvents(events);
       this.courseView?.setFlags(this.flags());
       this.syncBalls();
     }
@@ -282,8 +322,10 @@ export class PlayScene extends Phaser.Scene {
     const { phase, activePlayer } = this.state;
     if (phase === 'holeOver') {
       this.showHoleBand();
+      playTones(holeSting(this.state.hole.lastResult));
     } else if (phase === 'matchOver') {
       this.showResultPanel();
+      playTones(matchSting(matchWinner(this.state)));
     } else if (activePlayer === 1 && (phase === 'placing' || phase === 'aiming')) {
       this.scheduleAiTurn();
     }
@@ -319,7 +361,10 @@ export class PlayScene extends Phaser.Scene {
 
   private fire(shot: Shot): void {
     shoot(this.state, shot);
-    if (this.state.phase === 'rolling') this.rolling = true;
+    if (this.state.phase === 'rolling') {
+      this.rolling = true;
+      synth.play(shotTone(shot.power));
+    }
     this.refreshHud();
   }
 
@@ -342,9 +387,31 @@ export class PlayScene extends Phaser.Scene {
     this.scene.restart({} satisfies PlaySceneData);
   }
 
+  private onToggleMute(): void {
+    const muted = toggleMute(this.save);
+    this.muteButton.setLabel(muteLabel(muted));
+  }
+
+  // --------------------------------------------------------------------- audio
+
+  /** Plays the tones for one frame's physics events; wall taps are throttled. */
+  private playEvents(events: readonly BallEvent[]): void {
+    let wallTapped = false;
+    for (const event of events) {
+      if (event === 'wall') {
+        if (wallTapped || this.time.now - this.lastWallTapAt < WALL_TAP_GAP_MS) continue;
+        wallTapped = true;
+        this.lastWallTapAt = this.time.now;
+      }
+      playTones(tonesForEvent(event));
+    }
+  }
+
   // --------------------------------------------------------------------- input
 
   private onPointerDown(pointer: Phaser.Input.Pointer, currentlyOver: Phaser.GameObjects.GameObject[]): void {
+    // Browsers only allow audio after a user gesture: the first touch is it.
+    synth.unlock();
     // Taps on buttons are theirs alone.
     if (currentlyOver.length > 0) return;
     const { phase, activePlayer } = this.state;
@@ -366,6 +433,8 @@ export class PlayScene extends Phaser.Scene {
     this.dragStart = { x: pointer.x, y: pointer.y };
     this.pendingShot = null;
     this.aimDot.setPosition(pointer.x, pointer.y).setVisible(true);
+    // The player has taken control: the pointer has done its job.
+    this.turnPointer.root.setVisible(false);
   }
 
   private onPointerMove(pointer: Phaser.Input.Pointer): void {
@@ -389,16 +458,128 @@ export class PlayScene extends Phaser.Scene {
 
   // ----------------------------------------------------------------- rendering
 
+  /**
+   * Moves the ball sprites to the logical balls. A ball that has just been
+   * holed squashes and fades into the cup instead of vanishing; the logical
+   * ball is untouched. A ball that was already holed when the scene was built
+   * (a resumed match) simply stays hidden.
+   */
   private syncBalls(): void {
     for (const player of PLAYERS) {
       const ball = this.state.hole.balls[player];
       const sprite = this.ballSprites[player];
       if (!ball) {
+        this.resetBallSprite(player);
         sprite.setVisible(false);
         continue;
       }
-      sprite.setPosition(COURSE_ORIGIN.x + ball.x, COURSE_ORIGIN.y + ball.y).setVisible(!ball.holed);
+      if (ball.holed) {
+        if (sprite.visible && !this.holing[player]) this.squashIntoHole(player);
+        continue;
+      }
+      this.resetBallSprite(player);
+      sprite.setPosition(COURSE_ORIGIN.x + ball.x, COURSE_ORIGIN.y + ball.y).setVisible(true);
     }
+  }
+
+  /** Stops any hole animation on a ball sprite and restores its shape. */
+  private resetBallSprite(player: Player): void {
+    if (!this.holing[player]) return;
+    const sprite = this.ballSprites[player];
+    this.tweens.killTweensOf(sprite);
+    this.holing[player] = false;
+    sprite.setScale(1).setAlpha(1);
+  }
+
+  /** Squash-and-fade tween on the ball sprite only; ends with the sprite hidden. */
+  private squashIntoHole(player: Player): void {
+    const sprite = this.ballSprites[player];
+    this.holing[player] = true;
+    this.tweens.add({
+      targets: sprite,
+      x: COURSE_ORIGIN.x + this.course.hole.x,
+      y: COURSE_ORIGIN.y + this.course.hole.y,
+      scaleX: 1.3,
+      scaleY: 0.4,
+      alpha: 0,
+      duration: HOLE_SQUASH_MS,
+      ease: 'Quad.easeIn',
+      onComplete: () => {
+        if (!this.holing[player]) return;
+        this.holing[player] = false;
+        sprite.setVisible(false).setScale(1).setAlpha(1);
+      },
+    });
+  }
+
+  private makeAimRing(): void {
+    this.aimRing = this.add
+      .circle(0, 0, BALL_RADIUS + 7)
+      .setStrokeStyle(2, COLOURS.aimRing, 0.9)
+      .setName('aimRing')
+      .setDepth(9)
+      .setVisible(false);
+    this.tweens.add({
+      targets: this.aimRing,
+      scale: { from: 1, to: 1.4 },
+      alpha: { from: 0.95, to: 0.35 },
+      duration: 650,
+      ease: 'Sine.easeInOut',
+      yoyo: true,
+      repeat: -1,
+    });
+  }
+
+  /** Shows the pulsing ring around the active ball while it is being aimed. */
+  private refreshAimRing(): void {
+    const { phase, activePlayer } = this.state;
+    const ball = this.state.hole.balls[activePlayer];
+    if (phase !== 'aiming' || !ball || ball.holed) {
+      this.aimRing.setVisible(false);
+      return;
+    }
+    this.aimRing.setPosition(COURSE_ORIGIN.x + ball.x, COURSE_ORIGIN.y + ball.y).setVisible(true);
+  }
+
+  private makeTurnPointer(): void {
+    const pill = this.add.rectangle(0, 0, 112, 28, COLOURS.pointer).setStrokeStyle(2, 0xffffff, 0.35);
+    const label = this.add
+      .text(0, 0, 'YOUR TURN', { fontFamily: FONT, fontSize: '13px', fontStyle: 'bold', color: COLOURS.pointerText })
+      .setOrigin(0.5, 0.5);
+    // Points down at the ball by default; rotated 180° when shown below it.
+    const arrow = this.add.triangle(0, 0, 0, 0, 14, 0, 7, 10, COLOURS.pointer).setOrigin(0.5, 0.5);
+    const bob = this.add.container(0, 0, [pill, label, arrow]);
+    const root = this.add.container(0, 0, [bob]).setName('turnPointer').setDepth(35).setVisible(false);
+    this.tweens.add({
+      targets: bob,
+      y: { from: 0, to: -6 },
+      duration: 420,
+      ease: 'Sine.easeInOut',
+      yoyo: true,
+      repeat: -1,
+    });
+    this.turnPointer = { root, bob, pill, label, arrow };
+  }
+
+  /** Shows the "your turn" bubble over the human's ball when control returns. */
+  private refreshTurnPointer(): void {
+    const { phase, activePlayer } = this.state;
+    const ball = this.state.hole.balls[0];
+    const { root, pill, label, arrow } = this.turnPointer;
+    if (phase !== 'aiming' || activePlayer !== 0 || !ball || ball.holed || this.dragStart) {
+      root.setVisible(false);
+      return;
+    }
+    const bx = COURSE_ORIGIN.x + ball.x;
+    const by = COURSE_ORIGIN.y + ball.y;
+    const below = by < POINTER_FLIP_Y;
+    const sign = below ? 1 : -1;
+    // Keep the pill on screen while the arrow stays over the ball.
+    const pillShift = bx < 64 ? 64 - bx : bx > DESIGN_WIDTH - 64 ? DESIGN_WIDTH - 64 - bx : 0;
+    arrow.setPosition(0, sign * 20).setAngle(below ? 180 : 0);
+    pill.setPosition(pillShift, sign * 40);
+    label.setPosition(pillShift, sign * 40);
+    root.setPosition(bx, by).setVisible(true);
   }
 
   private makeCard(player: Player): PlayerCard {
@@ -440,14 +621,47 @@ export class PlayScene extends Phaser.Scene {
     return { frame, points, shots, turn };
   }
 
+  /** Mute toggle in the gap between the two HUD cards. */
+  private makeMuteButton(): void {
+    this.muteButton = new BigButton(this, DESIGN_WIDTH / 2, CARD.y + CARD.h / 2, {
+      label: muteLabel(this.save.get().muted),
+      width: 76,
+      height: 56,
+      color: COLOURS.card,
+      onTap: () => this.onToggleMute(),
+    })
+      .setName('muteButton')
+      .setDepth(31);
+  }
+
   private makeHint(): void {
     const y = 760;
-    this.add.rectangle(DESIGN_WIDTH / 2, y, 440, 44, COLOURS.card).setStrokeStyle(2, COLOURS.cardEdge, 1).setDepth(30);
+    this.hintBg = this.add
+      .rectangle(DESIGN_WIDTH / 2, y, 440, 44, COLOURS.card)
+      .setStrokeStyle(2, COLOURS.cardEdge, 1)
+      .setName('hintBand')
+      .setDepth(30);
     this.hintLabel = this.add
       .text(DESIGN_WIDTH / 2, y, '', { fontFamily: FONT, fontSize: '15px', color: COLOURS.text })
       .setOrigin(0.5, 0.5)
       .setName('hintLabel')
       .setDepth(31);
+  }
+
+  /** Fades the hint band out once and keeps it hidden for the rest of the match. */
+  private dismissHint(): void {
+    if (this.hintDismissed) return;
+    this.hintDismissed = true;
+    const targets = [this.hintBg, this.hintLabel];
+    this.tweens.add({
+      targets,
+      alpha: 0,
+      duration: HINT_FADE_MS,
+      ease: 'Quad.easeOut',
+      onComplete: () => {
+        for (const target of targets) target.setVisible(false);
+      },
+    });
   }
 
   private makeHoleBand(): void {
@@ -509,7 +723,7 @@ export class PlayScene extends Phaser.Scene {
   }
 
   private refreshHud(): void {
-    const { hole, points, activePlayer, phase, holeIndex } = this.state;
+    const { hole, points, activePlayer, phase } = this.state;
     const inPlay = phase === 'placing' || phase === 'aiming' || phase === 'rolling';
     for (const player of PLAYERS) {
       const card = this.cards[player];
@@ -521,7 +735,24 @@ export class PlayScene extends Phaser.Scene {
       card.frame.setStrokeStyle(2, active ? COLOURS.cardActiveEdge : COLOURS.cardEdge, 1);
     }
 
-    this.hintLabel.setVisible(holeIndex === 0);
+    this.refreshAimRing();
+    this.refreshTurnPointer();
+    this.refreshHint(inPlay);
+  }
+
+  /**
+   * Hint band: hole 1 only, and only until the human's first shot has settled,
+   * after which it fades out for good. Once the fade starts the tween owns the
+   * band's visibility.
+   */
+  private refreshHint(inPlay: boolean): void {
+    const { hole, activePlayer, phase, holeIndex } = this.state;
+    if (holeIndex === 0 && hole.shots[0] >= 1 && phase !== 'rolling') this.dismissHint();
+    if (this.hintDismissed) return;
+
+    const show = holeIndex === 0;
+    this.hintBg.setVisible(show);
+    this.hintLabel.setVisible(show);
     if (!inPlay) {
       this.hintLabel.setText('');
     } else if (activePlayer === 1) {
