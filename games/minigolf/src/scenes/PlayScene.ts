@@ -88,7 +88,7 @@ export class PlayScene extends Phaser.Scene {
   }
 
   isBallAtRest(): boolean {
-    return isAtRest(this.ball);
+    return isAtRest(this.ball, this.course);
   }
 
   private drawCourt(): void {
@@ -109,7 +109,7 @@ export class PlayScene extends Phaser.Scene {
   }
 
   private onPointerDown(pointer: Phaser.Input.Pointer): void {
-    if (this.dragStart || !isAtRest(this.ball)) return;
+    if (this.dragStart || !this.isBallAtRest()) return;
     this.dragStart = { x: pointer.x, y: pointer.y };
     this.pendingShot = null;
     this.aimDot.setPosition(pointer.x, pointer.y).setVisible(true);
@@ -129,7 +129,7 @@ export class PlayScene extends Phaser.Scene {
     this.aimDot.setVisible(false);
     this.aimLine.setVisible(false);
     this.powerLabel.setVisible(false);
-    if (shot && isAtRest(this.ball)) {
+    if (shot && this.isBallAtRest()) {
       applyShot(this.ball, shot);
     }
   }

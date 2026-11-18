@@ -1,7 +1,8 @@
 // Ball physics. Pure TypeScript: no Phaser, no wall-clock, no Math.random.
 // Fixed-step and deterministic: the same inputs always give bitwise-identical
 // positions.
-import type { Course, Rect } from './course';
+import type { Vec2 } from '@studio/core';
+import { rectCentre, type Conveyor, type ConveyorDir, type Course, type Rect } from './course';
 
 export interface Ball {
   x: number;
@@ -10,10 +11,14 @@ export interface Ball {
   vy: number;
   /** Set once the ball has dropped into the hole. A holed ball never moves. */
   holed?: boolean;
+  /** Where the current shot started; the ball returns here after hitting water. */
+  shotOrigin?: Vec2;
+  /** Seconds the ball has rolled since the current shot. Reset by each shot. */
+  rollTime?: number;
 }
 
 /** Things that happened during one `stepBall` call, for sound and HUD. */
-export type BallEvent = 'wall' | 'holed';
+export type BallEvent = 'wall' | 'holed' | 'water' | 'timeout';
 
 /** Simulation step in seconds. */
 export const FIXED_DT = 1 / 120;
@@ -28,8 +33,22 @@ export const WALL_RESTITUTION = 0.85;
 export const REST_SPEED = 5;
 /** Faster than this and the ball rolls over the hole instead of dropping in. */
 export const HOLE_CAPTURE_SPEED = 260;
+/** Speed of a conveyor belt, course units per second. */
+export const BELT_SPEED = 160;
+/** A ball still moving after this many seconds of roll is stopped where it is. */
+export const MAX_ROLL_SECONDS = 12;
 
-export const isAtRest = (ball: Ball): boolean => ball.vx === 0 && ball.vy === 0;
+/**
+ * True when the ball has stopped. Pass the course to also rule out a ball
+ * sitting on a conveyor: its velocity can be exactly zero for one step at a
+ * turning point, but the belt is about to carry it off, so it is not at rest
+ * unless the roll has timed out.
+ */
+export const isAtRest = (ball: Ball, course?: Course): boolean => {
+  if (ball.vx !== 0 || ball.vy !== 0) return false;
+  if (!course || ball.holed) return true;
+  return !conveyorAt(ball, course) || (ball.rollTime ?? 0) >= MAX_ROLL_SECONDS;
+};
 
 /** True when the point lies inside the rectangle (edges inclusive). */
 const containsPoint = (rect: Rect, x: number, y: number): boolean =>
@@ -39,26 +58,67 @@ const containsPoint = (rect: Rect, x: number, y: number): boolean =>
 export const isInSand = (ball: Ball, course: Course): boolean =>
   course.sand.some((patch) => containsPoint(patch, ball.x, ball.y));
 
+/** True when the ball's centre is inside any water rect of the course. */
+export const isInWater = (ball: Ball, course: Course): boolean =>
+  course.water.some((pond) => containsPoint(pond, ball.x, ball.y));
+
+/** The conveyor under the ball's centre, if any (first match wins). */
+export const conveyorAt = (ball: Ball, course: Course): Conveyor | undefined =>
+  course.conveyors.find((belt) => containsPoint(belt.rect, ball.x, ball.y));
+
+/** Velocity of the belt surface for a conveyor direction (+y is down). */
+export const beltVelocity = (dir: ConveyorDir): Vec2 => {
+  switch (dir) {
+    case 'up':
+      return { x: 0, y: -BELT_SPEED };
+    case 'down':
+      return { x: 0, y: BELT_SPEED };
+    case 'left':
+      return { x: -BELT_SPEED, y: 0 };
+    case 'right':
+      return { x: BELT_SPEED, y: 0 };
+  }
+};
+
+const STILL: Readonly<Vec2> = { x: 0, y: 0 };
+
 /**
  * Advances the ball by `dt` seconds: linear friction (grass or sand, decided by
  * where the centre is at the start of the step), rest snap, collision with the
- * playfield edges and interior walls, then hole capture. Mutates `ball` and
- * returns the events of this step.
+ * playfield edges and interior walls, water reset, hole capture, then the roll
+ * timeout. Mutates `ball` and returns the events of this step.
+ *
+ * Friction acts on the velocity relative to the ground. Off a conveyor the
+ * ground is still; on one it is the belt, so the ball never rests there but
+ * settles at exactly belt speed until it leaves.
  *
  * Friction is applied first, then collisions reflect what is left, so on the
  * contact step `vx_after = 0.85 * (|vx_before| - FRICTION_GRASS * dt)`.
  */
 export const stepBall = (ball: Ball, course: Course, dt: number): BallEvent[] => {
   if (ball.holed) return [];
+  const conveyor = conveyorAt(ball, course);
   const speed = Math.hypot(ball.vx, ball.vy);
-  if (speed === 0) return [];
+  // A stopped ball stays stopped unless a belt is under it. Once the roll has
+  // timed out it stays put even on a belt, until the next shot resets rollTime.
+  const timedOut = (ball.rollTime ?? 0) >= MAX_ROLL_SECONDS;
+  if (speed === 0 && (!conveyor || timedOut)) return [];
 
-  // Friction: constant deceleration along the direction of travel.
+  ball.rollTime = (ball.rollTime ?? 0) + dt;
+
+  // Friction: constant deceleration along the direction of travel relative to
+  // the belt (or to still ground).
+  const belt = conveyor ? beltVelocity(conveyor.dir) : STILL;
+  const rvx = ball.vx - belt.x;
+  const rvy = ball.vy - belt.y;
+  const relSpeed = Math.hypot(rvx, rvy);
   const friction = isInSand(ball, course) ? FRICTION_SAND : FRICTION_GRASS;
-  const slowed = Math.max(0, speed - friction * dt);
-  const scale = slowed < REST_SPEED ? 0 : slowed / speed;
-  const nvx = ball.vx * scale;
-  const nvy = ball.vy * scale;
+  const slowed = Math.max(0, relSpeed - friction * dt);
+  // Below REST_SPEED the relative velocity snaps to zero: at rest on grass, or
+  // carried at exactly belt speed on a conveyor.
+  const scale = relSpeed === 0 || slowed < REST_SPEED ? 0 : slowed / relSpeed;
+  const nvx = rvx * scale + belt.x;
+  const nvy = rvy * scale + belt.y;
 
   // Trapezoidal integration is exact for constant deceleration, so a ball at
   // 240 u/s on grass travels 120 units before stopping.
@@ -75,7 +135,23 @@ export const stepBall = (ball: Ball, course: Course, dt: number): BallEvent[] =>
   }
   if (hitWall) events.push('wall');
 
+  if (isInWater(ball, course)) {
+    const origin = ball.shotOrigin ?? rectCentre(course.start);
+    ball.x = origin.x;
+    ball.y = origin.y;
+    ball.vx = 0;
+    ball.vy = 0;
+    events.push('water');
+    return events;
+  }
+
   if (captureInHole(ball, course)) events.push('holed');
+
+  if (ball.rollTime >= MAX_ROLL_SECONDS && !isAtRest(ball)) {
+    ball.vx = 0;
+    ball.vy = 0;
+    events.push('timeout');
+  }
 
   return events;
 };

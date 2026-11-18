@@ -1,19 +1,39 @@
 import { describe, expect, it } from 'vitest';
-import { emptyCourse, type Rect } from './course';
-import { SAND_COURT_STRIP, WALL_COURT_WALL, openCourt, sandCourt, wallCourt } from './courses/testCourses';
+import { COURSE_HEIGHT, emptyCourse, rectCentre, type Rect } from './course';
+import {
+  CONVEYOR_COURT_BELT,
+  DOWN_CONVEYOR_COURT_BELT,
+  PING_PONG_COURT_BELTS,
+  PING_PONG_COURT_UP,
+  SAND_COURT_STRIP,
+  WALL_COURT_WALL,
+  WATER_COURT_POND,
+  conveyorCourt,
+  downConveyorCourt,
+  openCourt,
+  pingPongCourt,
+  sandCourt,
+  wallCourt,
+  waterCourt,
+} from './courses/testCourses';
 import {
   BALL_RADIUS,
+  BELT_SPEED,
   FIXED_DT,
   FRICTION_GRASS,
   FRICTION_SAND,
   HOLE_CAPTURE_SPEED,
+  MAX_ROLL_SECONDS,
   WALL_RESTITUTION,
+  conveyorAt,
   isAtRest,
   isInSand,
+  isInWater,
   stepBall,
   type Ball,
   type BallEvent,
 } from './physics';
+import { MAX_SHOT_SPEED, applyShot } from './shot';
 
 const run = (ball: Ball, steps: number): Ball => {
   const course = emptyCourse();
@@ -355,5 +375,235 @@ describe('physics: walls, sand and the hole', () => {
     expect(Object.is(a.vx, b.vx)).toBe(true);
     expect(Object.is(a.vy, b.vy)).toBe(true);
     expect(a.holed).toBe(b.holed);
+  });
+});
+
+describe('physics: water, conveyors and the roll timeout', () => {
+  it('constants match the spec', () => {
+    expect(BELT_SPEED).toBe(160);
+    expect(MAX_ROLL_SECONDS).toBe(12);
+  });
+
+  it('a ball shot into water ends at exactly its shotOrigin with velocity 0 and one "water" event', () => {
+    const course = waterCourt();
+    const tee = rectCentre(course.start);
+    const ball: Ball = { x: tee.x, y: tee.y, vx: 0, vy: 0 };
+    // 300 u/s straight up: grass alone would stop it after 187.5 units, 7.5 units
+    // past the pond's bottom edge, so the centre does enter the water.
+    applyShot(ball, { angle: -Math.PI / 2, power: 300 / MAX_SHOT_SPEED });
+    expect(ball.shotOrigin).toEqual({ x: tee.x, y: tee.y });
+    expect(ball.y - WATER_COURT_POND.y - WATER_COURT_POND.h).toBe(180);
+
+    const events: BallEvent[] = [];
+    for (let i = 0; i < 600; i++) events.push(...stepBall(ball, course, FIXED_DT));
+
+    expect(events.filter((e) => e === 'water')).toHaveLength(1);
+    expect(events).not.toContain('wall');
+    expect(events).not.toContain('holed');
+    expect(Object.is(ball.x, tee.x)).toBe(true);
+    expect(Object.is(ball.y, tee.y)).toBe(true);
+    expect(ball.vx).toBe(0);
+    expect(ball.vy).toBe(0);
+    expect(isAtRest(ball)).toBe(true);
+    expect(ball.holed).toBeFalsy();
+
+    // Back on the tee it just sits there.
+    const frozen = { ...ball };
+    for (let i = 0; i < 120; i++) expect(stepBall(ball, course, FIXED_DT)).toEqual([]);
+    expect(ball).toEqual(frozen);
+  });
+
+  it('isInWater is true only while the centre is inside a water rect', () => {
+    const course = waterCourt();
+    const pond = WATER_COURT_POND;
+    expect(isInWater({ x: 200, y: pond.y + pond.h + 1, vx: 0, vy: 0 }, course)).toBe(false);
+    expect(isInWater({ x: 200, y: pond.y + pond.h, vx: 0, vy: 0 }, course)).toBe(true);
+    expect(isInWater({ x: pond.x - 1, y: 250, vx: 0, vy: 0 }, course)).toBe(false);
+    expect(isInWater({ x: 200, y: 250, vx: 0, vy: 0 }, emptyCourse())).toBe(false);
+  });
+
+  it('without a shotOrigin the water hazard returns the ball to the tee', () => {
+    const course = waterCourt();
+    const pond = WATER_COURT_POND;
+    const ball: Ball = { x: pond.x + pond.w / 2, y: pond.y + pond.h + 1, vx: 0, vy: -200 };
+    expect(stepBall(ball, course, FIXED_DT)).toEqual(['water']);
+    expect({ x: ball.x, y: ball.y }).toEqual(rectCentre(course.start));
+    expect(isAtRest(ball)).toBe(true);
+  });
+
+  it('a ball placed with zero velocity on an up-conveyor leaves the belt within 3 s and then rests above it', () => {
+    const course = conveyorCourt();
+    const belt = CONVEYOR_COURT_BELT.rect;
+    const ball: Ball = { x: belt.x + belt.w / 2, y: belt.y + belt.h / 2, vx: 0, vy: 0 };
+    expect(isAtRest(ball)).toBe(true);
+    expect(conveyorAt(ball, course)).toBeDefined();
+
+    let leftAfterSteps = -1;
+    for (let i = 0; i < 3 * 120; i++) {
+      stepBall(ball, course, FIXED_DT);
+      if (!conveyorAt(ball, course)) {
+        leftAfterSteps = i + 1;
+        break;
+      }
+    }
+    expect(leftAfterSteps).toBeGreaterThan(0);
+    expect(leftAfterSteps * FIXED_DT).toBeLessThanOrEqual(3);
+    expect(ball.y).toBeLessThan(belt.y);
+    expect(ball.vy).toBeLessThan(0);
+    expect(ball.vx).toBe(0);
+    expect(ball.x).toBe(belt.x + belt.w / 2);
+
+    let steps = 0;
+    while (!isAtRest(ball) && steps < 600) {
+      stepBall(ball, course, FIXED_DT);
+      steps++;
+    }
+    expect(isAtRest(ball)).toBe(true);
+    expect(ball.y).toBeLessThan(belt.y);
+    expect(conveyorAt(ball, course)).toBeUndefined();
+  });
+
+  it('a momentary zero velocity on a belt is not rest, unless the roll has timed out', () => {
+    const course = pingPongCourt();
+    const rect = PING_PONG_COURT_UP.rect;
+    const ball: Ball = { x: rect.x + rect.w / 2, y: rect.y + rect.h / 2, vx: 0, vy: 0 };
+    expect(isAtRest(ball)).toBe(true); // velocity alone says stopped...
+    expect(isAtRest(ball, course)).toBe(false); // ...but the belt is about to move it
+    expect(isAtRest({ ...ball, x: 10, y: 10 }, course)).toBe(true); // off the belt: really at rest
+    expect(isAtRest({ ...ball, rollTime: MAX_ROLL_SECONDS }, course)).toBe(true); // timed out on the belt
+    expect(isAtRest({ ...ball, vy: -BELT_SPEED }, course)).toBe(false);
+  });
+
+  it('on a conveyor the ball never rests: it settles at exactly belt speed', () => {
+    const course = conveyorCourt();
+    const rect = { x: CONVEYOR_COURT_BELT.rect.x, y: 0, w: CONVEYOR_COURT_BELT.rect.w, h: COURSE_HEIGHT };
+    course.conveyors = [{ rect, dir: 'up' }];
+    const ball: Ball = { x: rect.x + rect.w / 2, y: 540, vx: 0, vy: 0 };
+    for (let i = 0; i < 120; i++) {
+      stepBall(ball, course, FIXED_DT);
+      expect(isAtRest(ball)).toBe(false);
+    }
+    // Relative speed started at 160 and fell at 240 u/s², so after 2/3 s the
+    // ball is carried at belt speed exactly.
+    expect(ball.vx).toBe(0);
+    expect(ball.vy).toBe(-BELT_SPEED);
+  });
+
+  it('a ball entering a down-conveyor at 100 u/s upward is turned around and exits the bottom edge', () => {
+    const course = downConveyorCourt();
+    const rect = DOWN_CONVEYOR_COURT_BELT.rect;
+    const bottom = rect.y + rect.h;
+    const ball: Ball = { x: rect.x + rect.w / 2, y: bottom, vx: 0, vy: -100 };
+    expect(conveyorAt(ball, course)).toBeDefined();
+
+    let minY = ball.y;
+    let exited = false;
+    for (let i = 0; i < 600 && !exited; i++) {
+      stepBall(ball, course, FIXED_DT);
+      minY = Math.min(minY, ball.y);
+      if (!conveyorAt(ball, course)) exited = true;
+    }
+    expect(exited).toBe(true);
+    expect(minY).toBeGreaterThan(rect.y); // never reached the top edge
+    expect(minY).toBeLessThan(bottom); // but did travel into the belt
+    expect(ball.y).toBeGreaterThan(bottom); // left through the bottom edge
+    expect(ball.vy).toBeGreaterThan(0);
+    expect(ball.vx).toBe(0);
+    // Constant deceleration is time-symmetric: it leaves at about its entry speed.
+    expect(Math.abs(ball.vy - 100)).toBeLessThan(5);
+  });
+
+  it('a ball at 500 u/s upward crosses a 60-unit down-conveyor and exits the top', () => {
+    const course = downConveyorCourt();
+    const rect = DOWN_CONVEYOR_COURT_BELT.rect;
+    expect(rect.h).toBe(60);
+    const bottom = rect.y + rect.h;
+    const ball: Ball = { x: rect.x + rect.w / 2, y: bottom, vx: 0, vy: -500 };
+
+    let exited = false;
+    for (let i = 0; i < 120 && !exited; i++) {
+      stepBall(ball, course, FIXED_DT);
+      expect(ball.y).toBeLessThanOrEqual(bottom); // never pushed back out the bottom
+      if (!conveyorAt(ball, course)) exited = true;
+    }
+    expect(exited).toBe(true);
+    expect(ball.y).toBeLessThan(rect.y);
+    expect(ball.vy).toBeLessThan(0);
+    // The belt and grass friction took some speed off during the crossing.
+    expect(-ball.vy).toBeLessThan(500);
+    expect(-ball.vy).toBeGreaterThan(400);
+  });
+
+  it('a ball bouncing forever between two conveyors is at rest after at most 12 s + one step with one "timeout" event', () => {
+    const course = pingPongCourt();
+    const up = PING_PONG_COURT_UP;
+    expect(up.dir).toBe('up');
+    expect(PING_PONG_COURT_BELTS).toHaveLength(2);
+    const ball: Ball = { x: up.rect.x + up.rect.w / 2, y: up.rect.y + up.rect.h / 2, vx: 0, vy: 0 };
+
+    const maxSteps = Math.round(MAX_ROLL_SECONDS / FIXED_DT) + 1;
+    const events: BallEvent[] = [];
+    let restAtStep = -1;
+    let visitedDown = false;
+    let visitedUp = false;
+    for (let i = 0; i < maxSteps; i++) {
+      events.push(...stepBall(ball, course, FIXED_DT));
+      const belt = conveyorAt(ball, course);
+      if (belt?.dir === 'down') visitedDown = true;
+      if (belt?.dir === 'up') visitedUp = true;
+      if (restAtStep < 0 && isAtRest(ball, course)) restAtStep = i + 1;
+    }
+
+    expect(visitedDown).toBe(true);
+    expect(visitedUp).toBe(true);
+    expect(events).not.toContain('wall');
+    expect(events).not.toContain('holed');
+    expect(isAtRest(ball)).toBe(true);
+    expect(isAtRest(ball, course)).toBe(true);
+    // It really was the timeout that stopped it: still rolling until 12 s.
+    expect(restAtStep).toBeGreaterThan(0);
+    expect(restAtStep * FIXED_DT).toBeGreaterThanOrEqual(MAX_ROLL_SECONDS - FIXED_DT - 1e-9);
+    expect(restAtStep).toBeLessThanOrEqual(maxSteps);
+    expect(events.filter((e) => e === 'timeout')).toHaveLength(1);
+    expect(ball.rollTime).toBeGreaterThanOrEqual(MAX_ROLL_SECONDS - 1e-9);
+
+    // Stopped where it is: on a belt, yet it stays put until the next shot.
+    expect(conveyorAt(ball, course)).toBeDefined();
+    const frozen = { ...ball };
+    for (let i = 0; i < 120; i++) expect(stepBall(ball, course, FIXED_DT)).toEqual([]);
+    expect(ball).toEqual(frozen);
+
+    // A new shot restarts the clock and the belt picks the ball up again.
+    applyShot(ball, { angle: 0, power: 0 });
+    expect(ball.rollTime).toBe(0);
+    stepBall(ball, course, FIXED_DT);
+    expect(isAtRest(ball)).toBe(false);
+  });
+
+  it('a normal shot that stops on its own never reports a timeout', () => {
+    const course = openCourt();
+    const ball: Ball = { x: 200, y: 480, vx: 0, vy: 0 };
+    applyShot(ball, { angle: Math.PI, power: 0.5 });
+    const events: BallEvent[] = [];
+    for (let i = 0; i < 1441; i++) events.push(...stepBall(ball, course, FIXED_DT));
+    expect(isAtRest(ball)).toBe(true);
+    expect(events).not.toContain('timeout');
+    expect(ball.rollTime).toBeLessThan(MAX_ROLL_SECONDS);
+  });
+
+  it('stays deterministic with conveyors in play', () => {
+    const play = (): Ball => {
+      const course = pingPongCourt();
+      const ball: Ball = { x: 187.5, y: 377.25, vx: 83.3, vy: -41.7 };
+      for (let i = 0; i < 1441; i++) stepBall(ball, course, FIXED_DT);
+      return ball;
+    };
+    const a = play();
+    const b = play();
+    expect(Object.is(a.x, b.x)).toBe(true);
+    expect(Object.is(a.y, b.y)).toBe(true);
+    expect(Object.is(a.vx, b.vx)).toBe(true);
+    expect(Object.is(a.vy, b.vy)).toBe(true);
+    expect(a.rollTime).toBe(b.rollTime);
   });
 });

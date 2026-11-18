@@ -15,6 +15,14 @@ export interface Hole {
   r: number;
 }
 
+export type ConveyorDir = 'up' | 'down' | 'left' | 'right';
+
+/** A moving belt. A ball whose centre is inside `rect` is carried along `dir`. */
+export interface Conveyor {
+  rect: Rect;
+  dir: ConveyorDir;
+}
+
 export interface Course {
   width: number;
   height: number;
@@ -22,6 +30,10 @@ export interface Course {
   walls: Rect[];
   /** Sand patches: higher friction while the ball's centre is inside one. */
   sand: Rect[];
+  /** Water: a ball whose centre enters one goes back to where its shot started. */
+  water: Rect[];
+  /** Conveyor belts: the ball is carried along `dir` at belt speed. */
+  conveyors: Conveyor[];
   hole: Hole;
   /** Where the ball is placed at the start of the hole. */
   start: Rect;
@@ -46,6 +58,8 @@ export const emptyCourse = (): Course => ({
   height: COURSE_HEIGHT,
   walls: [],
   sand: [],
+  water: [],
+  conveyors: [],
   hole: { x: COURSE_WIDTH / 2, y: 60, r: HOLE_RADIUS },
   start: { x: COURSE_WIDTH / 2 - 20, y: COURSE_HEIGHT - 100, w: 40, h: 40 },
 });

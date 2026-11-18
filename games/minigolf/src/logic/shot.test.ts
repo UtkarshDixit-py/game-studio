@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { Ball } from './physics';
 import { MAX_SHOT_SPEED, applyShot, shotFromDrag } from './shot';
 
 describe('shotFromDrag', () => {
@@ -32,5 +33,12 @@ describe('applyShot', () => {
     const ball = applyShot({ x: 0, y: 0, vx: 0, vy: 0 }, { angle: -Math.PI / 2, power: 1 });
     expect(ball.vx).toBeCloseTo(0, 9);
     expect(ball.vy).toBeCloseTo(-640, 9);
+  });
+
+  it('records where the shot started and restarts the roll clock', () => {
+    const ball: Ball = { x: 12, y: 34, vx: 0, vy: 0, rollTime: 7.5, shotOrigin: { x: 1, y: 2 } };
+    applyShot(ball, { angle: 0, power: 1 });
+    expect(ball.shotOrigin).toEqual({ x: 12, y: 34 });
+    expect(ball.rollTime).toBe(0);
   });
 });

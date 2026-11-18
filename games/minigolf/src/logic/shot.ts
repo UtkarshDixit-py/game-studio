@@ -28,9 +28,15 @@ export const shotFromDrag = (down: Vec2, current: Vec2): Shot | null => {
   return { angle: Math.atan2(-dy, -dx), power };
 };
 
-/** Sets the ball's velocity from a shot. Mutates and returns `ball`. */
+/**
+ * Sets the ball's velocity from a shot, remembers where the shot started (the
+ * water hazard returns the ball there) and restarts the roll clock. Mutates
+ * and returns `ball`.
+ */
 export const applyShot = (ball: Ball, shot: Shot): Ball => {
   const speed = shot.power * MAX_SHOT_SPEED;
+  ball.shotOrigin = { x: ball.x, y: ball.y };
+  ball.rollTime = 0;
   ball.vx = Math.cos(shot.angle) * speed;
   ball.vy = Math.sin(shot.angle) * speed;
   return ball;
