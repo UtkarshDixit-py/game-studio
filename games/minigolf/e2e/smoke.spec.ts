@@ -1,14 +1,34 @@
 import { expect, test, type Page } from '@playwright/test';
 import type Phaser from 'phaser';
 
-// Smoke: the game boots in a phone viewport, a pull-back drag shows the aim
-// HUD, and releasing rolls the ball until friction stops it.
+// Smoke: the game boots in a phone viewport, a tap places the ball, a pull-back
+// drag shows the aim HUD, and releasing rolls the ball until friction stops it.
 
 const waitForPlay = async (page: Page) => {
   await page.goto('/');
   await page.waitForFunction(() => window.__GAME__?.isBooted === true);
   await expect(page.locator('canvas')).toBeVisible();
   await page.waitForFunction(() => window.__GAME__!.scene.isActive('Play'));
+};
+
+/** Maps a 480x800 design point to a page point through the FIT-scaled canvas. */
+const toPage = async (page: Page, x: number, y: number) => {
+  const box = (await page.locator('canvas').boundingBox())!;
+  return { x: box.x + (x / 480) * box.width, y: box.y + (y / 800) * box.height };
+};
+
+/** Taps the centre of hole 1's start zone (course 56,504 → screen 96,654). */
+const placeBall = async (page: Page) => {
+  const { x, y } = await toPage(page, 40 + 56, 150 + 504);
+  await page.mouse.click(x, y);
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const scene = window.__GAME__!.scene.getScene('Play') as Phaser.Scene & { getState(): { phase: string } };
+        return scene.getState().phase;
+      }),
+    )
+    .toBe('aiming');
 };
 
 const ballPosition = (page: Page) =>
@@ -39,6 +59,7 @@ test('boots with a ball on the court', async ({ page }) => {
 
 test('pull-back drag shows power and shoots the ball', async ({ page }) => {
   await waitForPlay(page);
+  await placeBall(page);
   const before = await ballPosition(page);
   expect(await powerLabel(page)).toMatchObject({ visible: false });
 

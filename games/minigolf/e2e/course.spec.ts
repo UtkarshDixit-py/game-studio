@@ -81,15 +81,29 @@ test('setFlags hides broken props and shows the rest', async ({ page }) => {
   expect(result.restored).toEqual([true, true, true, true]);
 });
 
-test('ball starts in the centre of the start zone', async ({ page }) => {
+test('tapping the start zone places the ball inside it', async ({ page }) => {
   await waitForPlay(page);
-  const inside = await page.evaluate(() => {
-    const scene = window.__GAME__!.scene.getScene('Play') as Phaser.Scene & {
-      getBall(): { x: number; y: number };
-    };
-    const ball = scene.getBall();
-    // Hole 1's start zone is bottom-left: x 24..88, y 472..536 in course units.
-    return ball.x > 24 && ball.x < 88 && ball.y > 472 && ball.y < 536;
+  // The ball is unplaced until the human taps the start zone.
+  const unplaced = await page.evaluate(() => {
+    const scene = window.__GAME__!.scene.getScene('Play') as Phaser.Scene & { getBall(): unknown };
+    return scene.getBall();
   });
-  expect(inside).toBe(true);
+  expect(unplaced).toBeNull();
+
+  // Hole 1's start zone is bottom-left: x 24..88, y 472..536 in course units,
+  // drawn at the course origin (40,150). Tap its centre.
+  const box = (await page.locator('canvas').boundingBox())!;
+  await page.mouse.click(box.x + ((40 + 56) / 480) * box.width, box.y + ((150 + 504) / 800) * box.height);
+
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const scene = window.__GAME__!.scene.getScene('Play') as Phaser.Scene & {
+          getBall(): { x: number; y: number } | null;
+        };
+        const ball = scene.getBall();
+        return ball !== null && ball.x > 24 && ball.x < 88 && ball.y > 472 && ball.y < 536;
+      }),
+    )
+    .toBe(true);
 });
