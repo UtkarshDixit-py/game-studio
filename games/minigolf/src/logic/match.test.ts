@@ -119,6 +119,25 @@ describe('createMatch', () => {
   it('bot tees off first on hole 2 only', () => {
     expect([0, 1, 2].map(firstPlayer)).toEqual([0, 1, 0]);
   });
+
+  it('can start at a later hole (for ?hole=N), with that hole’s first player', () => {
+    const holes = [openCourt(), openCourt(), openCourt()];
+    const second = createMatch(1, holes, 1);
+    expect(second.holeIndex).toBe(1);
+    expect(second.activePlayer).toBe(1);
+    expect(second.phase).toBe('placing');
+    expect(second.points).toEqual([0, 0]);
+    const third = createMatch(1, holes, 2);
+    expect(third.holeIndex).toBe(2);
+    expect(third.activePlayer).toBe(0);
+    // Out-of-range starts are clamped into the hole list.
+    expect(createMatch(1, holes, 7).holeIndex).toBe(2);
+    expect(createMatch(1, holes, -3).holeIndex).toBe(0);
+    expect(createMatch(1, holes).holeIndex).toBe(0);
+    // Starting at the last hole still ends the match after it.
+    third.phase = 'holeOver';
+    expect(advance(third, holes.length).phase).toBe('matchOver');
+  });
 });
 
 describe('placing and shooting', () => {

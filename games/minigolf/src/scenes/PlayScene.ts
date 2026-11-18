@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { BigButton, DESIGN_HEIGHT, DESIGN_WIDTH } from '@studio/core/phaser';
 import type { Course } from '../logic/course';
-import { hole1 } from '../logic/courses/hole1';
+import { HOLES } from '../logic/courses';
 import {
   advance,
   createMatch,
@@ -66,6 +66,16 @@ const seedFromUrl = (): number => {
   return Number.isFinite(seed) ? seed : DEFAULT_SEED;
 };
 
+/**
+ * Parses `?hole=N` (1-based, as shown to players) from the page URL into a
+ * 0-based hole index, falling back to the first hole. `createMatch` clamps it.
+ */
+const holeIndexFromUrl = (): number => {
+  const raw = new URLSearchParams(window.location.search).get('hole');
+  const hole = raw === null ? Number.NaN : Number.parseInt(raw, 10);
+  return Number.isFinite(hole) ? hole - 1 : 0;
+};
+
 /** Short status glyph for the shots label: tick when holed, dash when out. */
 const resultGlyph = (result: PlayerResult): string | null => {
   if (result === 'holed') return '✓';
@@ -86,9 +96,10 @@ interface PlayerCard {
  * opponent take its turns on a timer. No rules live here.
  */
 export class PlayScene extends Phaser.Scene {
-  private readonly course: Course = hole1();
-  /** Holes in this match. T08 plays hole 1 only; T09 adds the rest. */
-  private readonly holes: Course[] = [this.course];
+  /** Holes in this match, in play order. */
+  private readonly holes: readonly Course[] = HOLES;
+  /** The course of the current hole: `holes[state.holeIndex]`. */
+  private course!: Course;
   private readonly opponent: Opponent = createAiOpponent();
 
   private state!: MatchState;
@@ -98,7 +109,7 @@ export class PlayScene extends Phaser.Scene {
   /** True while a bot turn is scheduled or in progress. */
   private aiBusy = false;
 
-  private courseView!: CourseView;
+  private courseView: CourseView | null = null;
   private ballSprites!: [Phaser.GameObjects.Arc, Phaser.GameObjects.Arc];
   private aimDot!: Phaser.GameObjects.Arc;
   private aimLine!: Phaser.GameObjects.Graphics;
@@ -123,15 +134,14 @@ export class PlayScene extends Phaser.Scene {
   create(): void {
     this.cameras.main.setBackgroundColor(COLOURS.background);
 
-    this.state = createMatch(seedFromUrl(), this.holes);
+    this.state = createMatch(seedFromUrl(), this.holes, holeIndexFromUrl());
     this.accumulator = 0;
     this.rolling = false;
     this.aiBusy = false;
     this.dragStart = null;
     this.pendingShot = null;
 
-    this.courseView = new CourseView(this, this.course, COURSE_ORIGIN.x, COURSE_ORIGIN.y);
-    this.add.existing(this.courseView);
+    this.loadCourse();
 
     const ball0 = this.add.circle(0, 0, BALL_RADIUS, COLOURS.ball0).setName('ball0').setDepth(10).setVisible(false);
     const ball1 = this.add
@@ -186,7 +196,7 @@ export class PlayScene extends Phaser.Scene {
       stepped = true;
     }
     if (stepped) {
-      this.courseView.setFlags(this.flags());
+      this.courseView?.setFlags(this.flags());
       this.syncBalls();
     }
     if (this.rolling && this.state.phase !== 'rolling') {
@@ -216,6 +226,19 @@ export class PlayScene extends Phaser.Scene {
 
   private flags(): HoleFlags {
     return { brokenProps: this.state.hole.brokenProps, collectedStars: this.state.hole.collectedStars };
+  }
+
+  /**
+   * Points `course` at the match's current hole and (re)builds its view. The
+   * previous view, if any, is destroyed; ball sprites are re-synced by the
+   * caller through `afterStateChange`.
+   */
+  private loadCourse(): void {
+    this.course = this.holes[this.state.holeIndex] ?? this.holes[0]!;
+    this.courseView?.destroy();
+    this.courseView = new CourseView(this, this.course, COURSE_ORIGIN.x, COURSE_ORIGIN.y);
+    this.add.existing(this.courseView);
+    this.courseView.setFlags(this.flags());
   }
 
   /** Called whenever the match settles into a new phase outside `rolling`. */
@@ -269,8 +292,13 @@ export class PlayScene extends Phaser.Scene {
   private onContinue(): void {
     if (this.state.phase !== 'holeOver') return;
     this.hideHoleBand();
+    const previous = this.state.holeIndex;
     advance(this.state, this.holes.length);
-    this.courseView.setFlags(this.flags());
+    if (this.state.holeIndex !== previous) {
+      this.loadCourse();
+    } else {
+      this.courseView?.setFlags(this.flags());
+    }
     this.afterStateChange();
   }
 

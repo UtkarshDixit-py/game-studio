@@ -103,21 +103,25 @@ const inRect = (rect: Course['start'], point: Vec2): boolean =>
   point.x >= rect.x && point.x <= rect.x + rect.w && point.y >= rect.y && point.y <= rect.y + rect.h;
 
 /**
- * A new match at the first hole, nobody placed. `holes` is the course list the
- * match will be played over; only its length matters here and it must be
- * `MATCH_HOLES` long for `advance` to end the match at the right time (pass
- * `holes.length` to `advance` for a shorter test match).
+ * A new match at hole `startHole` (0-based, default the first), nobody placed.
+ * `holes` is the course list the match will be played over; only its length
+ * matters here and it must be `MATCH_HOLES` long for `advance` to end the
+ * match at the right time (pass `holes.length` to `advance` for a shorter test
+ * match). A `startHole` outside the list is clamped into it.
  */
-export const createMatch = (seed: number, holes: Course[]): MatchState => ({
-  version: MATCH_VERSION,
-  seed,
-  rngState: seed >>> 0,
-  holeIndex: 0,
-  points: [0, 0],
-  activePlayer: firstPlayer(0),
-  phase: holes.length > 0 ? 'placing' : 'matchOver',
-  hole: freshHole(),
-});
+export const createMatch = (seed: number, holes: readonly Course[], startHole = 0): MatchState => {
+  const holeIndex = holes.length === 0 ? 0 : Math.min(Math.max(Math.trunc(startHole), 0), holes.length - 1);
+  return {
+    version: MATCH_VERSION,
+    seed,
+    rngState: seed >>> 0,
+    holeIndex,
+    points: [0, 0],
+    activePlayer: firstPlayer(holeIndex),
+    phase: holes.length > 0 ? 'placing' : 'matchOver',
+    hole: freshHole(),
+  };
+};
 
 /**
  * Places the active player's ball at `point` while `placing`. Points outside

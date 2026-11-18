@@ -119,7 +119,7 @@ test('a shot rolls, then the bot takes its turn without input', async ({ page })
   expect((await objectInfo(page, 'ball1')).visible).toBe(true);
 });
 
-test('hole over shows the band, continue leads to the match result', async ({ page }) => {
+test('hole over shows the band, continue leads to the next hole', async ({ page }) => {
   test.setTimeout(150_000);
   await waitForPlay(page);
 
@@ -162,7 +162,55 @@ test('hole over shows the band, continue leads to the match result', async ({ pa
   await expect.poll(async () => (await objectInfo(page, 'holeBand')).visible).toBe(false);
   await expect.poll(async () => (await objectInfo(page, 'continueButton')).visible).toBe(false);
 
-  // One hole in this task: continue ends the match.
+  // Continue moves on to hole 2, where the bot tees off on a fresh course.
+  await waitForPhase(page, (s) => s.phase === 'placing' && s.holeIndex === 1, 5_000);
+  const next = await getState(page);
+  expect(next.activePlayer).toBe(1);
+  expect(next.hole.balls).toEqual([null, null]);
+  expect(next.hole.shots).toEqual([0, 0]);
+  expect(next.points[0] + next.points[1]).toBe(over.points[0] + over.points[1]);
+  expect((await objectInfo(page, 'resultPanel')).visible).toBe(false);
+  expect((await objectInfo(page, 'ball0')).visible).toBe(false);
+  const banner = await page.evaluate(() => {
+    const course = window.__GAME__!.scene.getScene('Play').children.getByName('course') as Phaser.GameObjects.Container;
+    return (course.getByName('capBanner') as Phaser.GameObjects.Text).text;
+  });
+  expect(banner).toBe('MAX SHOTS 4');
+});
+
+test('continuing from the last hole shows the match result', async ({ page }) => {
+  test.setTimeout(150_000);
+  await waitForPlay(page, '?hole=3&seed=1');
+  expect((await getState(page)).holeIndex).toBe(2);
+  // Hole 3's start zone: x 12..68, y 492..548 in course units.
+  const tapStart3 = () => tapDesign(page, COURSE_ORIGIN.x + 40, COURSE_ORIGIN.y + 520);
+
+  for (let guard = 0; guard < 40; guard++) {
+    const state = await getState(page);
+    if (state.phase === 'holeOver' || state.phase === 'matchOver') break;
+    if (state.activePlayer === 0 && state.phase === 'placing') {
+      await tapStart3();
+      await waitForPhase(page, (s) => s.phase !== 'placing', 5_000);
+    } else if (state.activePlayer === 0 && state.phase === 'aiming') {
+      const shotsBefore = state.hole.shots[0];
+      await dragShot(page, 30);
+      await waitForPhase(page, (s) => s.hole.shots[0] > shotsBefore, 5_000);
+      await waitForPhase(page, (s) => s.phase !== 'rolling');
+    } else {
+      const mark = JSON.stringify([state.phase, state.activePlayer, state.hole.shots]);
+      await waitForPhase(
+        page,
+        (s) => s.phase !== 'rolling' && JSON.stringify([s.phase, s.activePlayer, s.hole.shots]) !== mark,
+        25_000,
+      );
+    }
+  }
+
+  expect((await getState(page)).phase).toBe('holeOver');
+  const button = await objectInfo(page, 'continueButton');
+  expect(button.visible).toBe(true);
+  await tapDesign(page, button.x, button.y);
+
   await waitForPhase(page, (s) => s.phase === 'matchOver', 5_000);
   const panel = await objectInfo(page, 'resultPanel');
   expect(panel.visible).toBe(true);
