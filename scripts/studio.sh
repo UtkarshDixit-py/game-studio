@@ -35,7 +35,7 @@ tmux set-option -t "$SESSION" allow-rename off
 tmux select-pane -t "$SESSION:studio.0" -T "orchestrator"
 tmux send-keys -t "$SESSION:studio.0" "cd '$ROOT' && claude $*" C-m
 
-tmux new-window -t "$SESSION" -n board -c "$ROOT"
+tmux new-window -a -t "$SESSION:studio" -n board -c "$ROOT"
 tmux select-pane -t "$SESSION:board.0" -T "progress board"
 tmux send-keys -t "$SESSION:board.0" "cd '$ROOT' && scripts/board.sh" C-m
 
