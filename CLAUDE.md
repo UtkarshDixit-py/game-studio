@@ -16,7 +16,8 @@ games/<name>/       one Phaser 3 + TypeScript + Vite game per folder, portrait 4
   e2e/              Playwright specs (phone viewport, touch)
 scripts/            studio.sh (tmux cockpit), ship-task.sh (check + commit + push), board.sh
 .claude/agents/     architect.md, developer.md, tester.md
-.github/workflows/  ci.yml (check + e2e on every push), pages.yml (manual only; repo is private)
+.github/workflows/  ci.yml (check + e2e on every push), pages.yml (optional, manual only)
+vercel.json         live site config; scripts/build-site.sh assembles site/
 ```
 
 Commands: `npm run check` (typecheck + unit tests + build all), `npm run e2e`
@@ -58,7 +59,8 @@ Never run `ship-task.sh` before a `PASS`. Never commit by hand. Never force-push
 
 ## Starting a new game
 
-1. Copy `games/minigolf` to `games/<name>`, rename in `package.json`
+1. Copy a skeleton game folder (`games/botbrawl` until it is built out) to
+   `games/<name>`, rename in `package.json`
    (`@games/<name>`), `src/logic/config.ts`, `index.html` title. Pick a free dev
    port in `package.json`. Playwright and CI discover game folders automatically.
 2. Spawn **architect** with the human's one-paragraph game idea. It writes SPEC.md

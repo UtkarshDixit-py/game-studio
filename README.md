@@ -1,81 +1,82 @@
 # Game Studio
 
-A lean monorepo for shipping small mobile games as separate Play Store apps.
-Phaser 3 + TypeScript + Vite, npm workspaces, Vitest, Playwright. One orchestrator
-agent (Claude Code) runs architect / developer / tester agents to build each game;
-every passing task is committed and pushed. The repo is private, so you test on
-your phone from the local dev server over Wi-Fi (section 3).
+An open-source monorepo for building small mobile web games with Phaser 3 and
+TypeScript, where one Claude Code orchestrator runs architect, developer and
+tester agents to build each game task by task. Every game is a portrait,
+touch-only web app that can later be wrapped as an Android app.
+
+**Play the games:** https://games-ten-steel.vercel.app
+
+## Games
+
+| Game | Folder | Status | Play |
+| --- | --- | --- | --- |
+| Putt Duel | `games/minigolf` | Playable. Mini golf match play against a bot, three holes with walls, sand, water, conveyors, portals, breakable props and stars. | [Open](https://games-ten-steel.vercel.app/minigolf/) |
+| Bot Brawl | `games/botbrawl` | Skeleton only. Not built yet. | |
+
+Each game has a `SPEC.md` (what it is) and a `TASKS.md` (the checklist it was
+built from), both written by the architect agent.
+
+## What is in here
 
 ```
-packages/core/       @studio/core: bootstrap (FIT, multi-touch), save, maths, synth audio, BigButton
-games/minigolf/      Mini Golf skeleton
+packages/core/       @studio/core: bootstrap (FIT scaling, multi-touch), save data, maths, synth audio, BigButton
+games/minigolf/      Putt Duel
 games/botbrawl/      Bot Brawl skeleton
-scripts/             studio.sh (tmux cockpit), ship-task.sh, board.sh
-.claude/             CLAUDE.md is the orchestrator; agents/ has architect, developer, tester
-.github/workflows/   ci.yml, pages.yml (manual only while the repo is private)
+scripts/             studio.sh (tmux cockpit), ship-task.sh, board.sh, build-site.sh
+CLAUDE.md            instructions for the orchestrator agent
+.claude/agents/      architect, developer and tester agent definitions
+.github/workflows/   ci.yml (check + browser tests on every push), pages.yml (optional, manual)
+vercel.json          build and hosting config for the live site
 ```
 
-## 1. Prerequisites
+Stack: Phaser 3, TypeScript, Vite, npm workspaces, Vitest for unit tests,
+Playwright for browser tests in a phone viewport.
 
-- Node 22+ and npm 10+ (`node -v`)
-- tmux (`brew install tmux`)
-- GitHub CLI (`brew install gh && gh auth login`)
-- Claude Code (`npm i -g @anthropic-ai/claude-code`)
+## Quick start
 
-## 2. Install and verify
+Needs Node 22+ and npm 10+.
 
 ```sh
+git clone https://github.com/UtkarshDixit-py/game-studio.git
+cd game-studio
 npm install
 npx playwright install chromium
-npm run check      # typecheck + unit tests + build every game
-npm run e2e        # Playwright smoke tests, phone viewport, all games
-npm run dev -w games/minigolf   # local dev server, open the URL on your phone (same Wi-Fi)
+npm run check                   # typecheck + unit tests + build every game
+npm run e2e                     # Playwright tests, phone viewport, all games
+npm run dev -w games/minigolf   # local dev server with live reload
 ```
 
-## 3. GitHub repo and testing on your phone
+### Testing on a phone
 
-The repo is private on GitHub. To recreate it from scratch:
+With the phone and the computer on the same Wi-Fi, run the dev server and open the
+`Network: http://<ip>:<port>/` URL that Vite prints. If it does not load, the
+network is isolating devices (common on office and guest Wi-Fi); use the phone's
+hotspot instead.
+
+## Deploying
+
+`vercel.json` builds every game and serves `site/`: an index page plus
+`/<game>/` for each built-out game. Skeletons without a `TASKS.md` are skipped
+(see `scripts/build-site.sh`). To host your own copy on Vercel:
 
 ```sh
-git add -A
-git commit -m "studio scaffold"
-gh repo create <your-user>/game-studio --private --source=. --remote=origin --push
+npm install --global vercel
+vercel login
+vercel deploy --prod --yes      # first run creates the project and prints the URL
 ```
 
-**Phone testing (private repo).** Phone and Mac on the same Wi-Fi:
+Connect the GitHub repo to the project in the Vercel dashboard to deploy on every
+push. Builds use `base: './'`, so the same output also works from a sub-folder on
+any static host. `.github/workflows/pages.yml` is an optional GitHub Pages
+deploy, off by default; see the comment at the top of that file.
 
-```sh
-npm run dev -w games/minigolf        # live reload while a task is in progress
-# or the production build, exactly what ships:
-npm run build -w games/minigolf && npm run preview -w games/minigolf
-```
+## The agent studio
 
-Vite prints a `Network: http://<mac-ip>:<port>/` line. Open that URL on the phone.
-If it does not load, the Wi-Fi is isolating devices (common on office and guest
-networks); use the phone's hotspot for the Mac instead, and allow incoming
-connections for `node` if macOS asks.
-
-**Public test URL on Vercel.** `vercel.json` builds every game and serves
-`site/`: an index page plus `/<game>/` for each built-out game (skeletons without
-a `TASKS.md` are skipped; see `scripts/build-site.sh`). One time, with your
-personal Vercel account:
-
-```sh
-npx vercel login
-npx vercel deploy --prod --yes   # first run creates the project and prints the URL
-```
-
-Run the deploy command again to publish the latest code, or connect the GitHub
-repo to the project in the Vercel dashboard to deploy on every push. The deployed
-site is public to anyone with the URL even though the repo is private.
-
-**GitHub Pages is off.** Pages needs a public repo on the free plan, so
-`pages.yml` is manual-only. To switch it on later, make the repo public, set
-**Settings → Pages → Source: GitHub Actions**, and restore the `push` trigger
-noted at the top of `.github/workflows/pages.yml`. Builds use `base: './'`, so
-they work from a Pages sub-folder and inside Capacitor's WebView unchanged.
-
-## 4. Start the studio
+The games here were built by Claude Code agents. You talk to one orchestrator; it
+plans, delegates and ships. You need [Claude Code](https://code.claude.com)
+(`npm i -g @anthropic-ai/claude-code`), tmux (`brew install tmux`) and the GitHub
+CLI (`brew install gh && gh auth login`).
 
 ```sh
 scripts/studio.sh
@@ -83,94 +84,101 @@ scripts/studio.sh
 
 This opens a tmux session with two windows:
 
-- **studio**: Claude Code (the orchestrator) in the left pane labelled `orchestrator`.
+- **studio**: Claude Code, the orchestrator, in a pane labelled `orchestrator`.
   Worker agents spawned as teammates appear as extra labelled panes.
-- **board**: live progress board (tasks done/todo per game, recent commits,
-  unpushed count). Switch windows with `Ctrl-b w` or `Ctrl-b 1` / `Ctrl-b 0`.
+- **board**: live progress board showing tasks done and to do per game, recent
+  commits and the unpushed count. Switch windows with `Ctrl-b 1` and `Ctrl-b 0`.
 
 ### First prompt to the orchestrator
 
 Paste something like:
 
 ```
-Read CLAUDE.md. Run the architect for games/minigolf with this idea:
-"Top-down mini golf. Drag back from the ball and release to shoot; power from drag
-length. 9 short holes with walls, sand that slows the ball, and one moving bumper.
-Par per hole, total strokes saved as best score." Show me TASKS.md, then start the
-developer/tester loop from T01 and ship each passing task.
+Read CLAUDE.md. Run the architect for games/botbrawl with this idea:
+"Top-down bot arena brawler. Virtual joystick under the left thumb, fire button
+under the right thumb, waves of bots, original names." Show me TASKS.md, then
+start the developer/tester loop from T01 and ship each passing task.
 ```
 
-For the second game, swap the folder and idea (bot arena brawler: top-down, virtual
-joystick left thumb, fire button right thumb, waves of bots, original names).
+### How a task ships
+
+1. The orchestrator spawns the **developer** with one task from `games/<name>/TASKS.md`.
+2. The developer implements it and runs `npm run check`. It never commits.
+3. The orchestrator spawns the **tester**, which adds and runs Vitest and
+   Playwright tests and replies `PASS` or `FAIL` with evidence. It never edits `src/`.
+4. On `PASS`, the orchestrator runs `scripts/ship-task.sh "<game>: T## <title>"`,
+   which re-runs `npm run check`, commits and pushes the current branch.
+5. On `FAIL`, it goes back to step 1 with the evidence, at most three times, then
+   asks the human.
+
+Permissions in `.claude/settings.json` allow npm, npx, `git add`, `git commit` and
+`git push origin`. They deny force pushes and reading `.env` files.
 
 ### Agent teams and the tmux panes (experimental)
 
 Worker panes rely on Claude Code **agent teams**, which are experimental. The repo
-enables them via `.claude/settings.json`:
+enables them in `.claude/settings.json`:
 
 ```json
 { "env": { "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1" }, "teammateMode": "auto" }
 ```
 
 With `teammateMode: "auto"`, teammates open as split panes when Claude Code runs
-inside tmux (which `studio.sh` guarantees) and the orchestrator spawns a *named*
+inside tmux, which `studio.sh` guarantees, and the orchestrator spawns a named
 agent. If teammate panes do not appear:
 
-1. Check your Claude Code version supports agent teams
+1. Check that your Claude Code version supports agent teams
    (`claude --version`; docs: https://code.claude.com/docs/en/agent-teams).
 2. Try `"teammateMode": "tmux"` in `.claude/settings.json`. That opens teammates
-   in a separate tmux session; Claude prints the attach command.
-3. **Fallback:** remove the `env` block (or set the variable to `0`). The
-   orchestrator then runs architect/developer/tester as ordinary in-process
-   subagents. Everything else (loop, shipping) works the same; you just see
-   their output summarised in the orchestrator pane instead of separate panes.
-   Press Up/Down then Enter in the orchestrator pane to open a subagent's transcript.
+   in a separate tmux session, and Claude prints the attach command.
+3. **Fallback:** remove the `env` block or set the variable to `0`. The
+   orchestrator then runs the workers as ordinary in-process subagents. The loop
+   and shipping work the same; you see their output summarised in the
+   orchestrator pane instead of in separate panes.
 
 Known limits from the docs: one team per session, teammates cannot spawn their own
-teams, `/resume` does not restore in-process teammates.
+teams, and `/resume` does not restore in-process teammates.
 
-## 5. How a task ships
-
-1. Orchestrator spawns **developer** (sonnet) with one task from `games/<name>/TASKS.md`.
-2. Developer implements it and runs `npm run check`. Never commits.
-3. Orchestrator spawns **tester** (haiku), which adds/runs Vitest + Playwright tests
-   and replies `PASS` or `FAIL` with evidence. It never edits `src/`.
-4. On `PASS`, orchestrator runs `scripts/ship-task.sh "<game>: T## <title>"`, which
-   re-runs `npm run check`, commits, and pushes the current branch. CI runs on every push.
-5. On `FAIL`, back to step 1 with the evidence, at most 3 times, then it asks you.
-
-Permissions in `.claude/settings.json` allow npm/npx, `git add/commit`, and
-`git push origin`; they deny force pushes and reading `.env` files.
-
-## 6. Adding a game
+## Adding a game
 
 ```sh
-cp -R games/minigolf games/<name>
+cp -R games/botbrawl games/<name>
 rm -rf games/<name>/node_modules games/<name>/dist
 ```
 
-Edit `games/<name>/package.json` (name `@games/<name>`, a free `dev` port),
+Edit `games/<name>/package.json` (name `@games/<name>` and a free `dev` port),
 `src/logic/config.ts` (id and title) and `index.html` (title). Run `npm install`.
-Playwright and CI pick up every folder under `games/` automatically. Then
-hand the idea to the orchestrator and let the architect write SPEC.md and TASKS.md.
+Playwright and CI pick up every folder under `games/` automatically. Then hand the
+idea to the orchestrator and let the architect write `SPEC.md` and `TASKS.md`.
 
-## 7. Android later
+Optionally drop phone screenshots and a short `notes.md` into
+`games/<name>/reference/` first. Screenshots are for studying mechanics only, are
+gitignored, and are never copied as assets.
+
+## Architecture rules
+
+These are enforced through `CLAUDE.md` and the agent definitions.
+
+- Game rules and maths are pure TypeScript in `src/logic/` with no Phaser imports,
+  so Vitest can test them. Scenes stay thin.
+- `window.__GAME__` exposes the Phaser game so Playwright can inspect it.
+- Changing `packages/core` is its own task and must keep every game green.
+- Mobile first: touch only, buttons 56px or larger, portrait 480x800.
+- Original names, art and sounds only. Mechanics may be borrowed; branding and
+  assets never are. No real-money mechanics anywhere.
+
+## Android later
 
 Each game builds to `games/<name>/dist` with a relative base path and a fixed
 portrait 480x800 design resolution with FIT scaling. Wrapping with Capacitor is
-`npx cap init` + `npx cap add android` pointing `webDir` at `dist`; no code changes
-expected. Not added now to keep the repo lean.
+`npx cap init` plus `npx cap add android` with `webDir` pointing at `dist`. It is
+not added yet, to keep the repo lean.
 
-## Rules baked into CLAUDE.md
+## Contributing
 
-- Game rules and maths are pure TypeScript in `src/logic/` (no Phaser) so Vitest tests them.
-- `window.__GAME__` exposes the Phaser game for Playwright.
-- Changing `packages/core` is its own task and must keep every game green.
-- Touch only, 56px+ buttons, portrait 480x800.
-- Original names, art and sounds. Copy mechanics, never branding or assets. No real-money mechanics.
+Issues and pull requests are welcome. Before opening a pull request, run
+`npm run check` and `npm run e2e`, and keep to the architecture rules above.
 
-## Reference material
+## License
 
-Before running the architect for a game, drop phone screenshots and a short
-`notes.md` into `games/<name>/reference/` (see the README there). Screenshots are
-for mechanics only, are gitignored, and are never copied as assets.
+[MIT](LICENSE). All game names, art and sounds in this repo are original.
