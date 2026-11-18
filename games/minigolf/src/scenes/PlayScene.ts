@@ -1,12 +1,13 @@
 import Phaser from 'phaser';
 import { DESIGN_HEIGHT, DESIGN_WIDTH } from '@studio/core/phaser';
-import { emptyCourse, type Course } from '../logic/course';
-import { BALL_RADIUS, FIXED_DT, isAtRest, stepBall, type Ball } from '../logic/physics';
+import { rectCentre, type Course } from '../logic/course';
+import { hole1 } from '../logic/courses/hole1';
+import { BALL_RADIUS, FIXED_DT, freshHoleFlags, isAtRest, stepBall, type Ball, type HoleFlags } from '../logic/physics';
 import { applyShot, shotFromDrag, type Shot } from '../logic/shot';
+import { CourseView } from './CourseView';
 
 /** Where the course's top-left corner sits on the 480x800 screen. */
 export const COURSE_ORIGIN = { x: 40, y: 150 } as const;
-const BORDER = 12;
 /** On-screen length of the aim line at full power. */
 const AIM_LINE_LENGTH = 120;
 /** Never simulate more than this much real time in one frame. */
@@ -14,22 +15,22 @@ const MAX_FRAME_DT = 0.1;
 
 const COLOURS = {
   background: 0x111218,
-  border: 0x3a3f47,
-  court: 0x2e8b45,
   ball: 0xffffff,
   aimDot: 0x9a9a9a,
   aimLine: 0xffffff,
 };
 
 /**
- * Thin scene: draws the court and ball, forwards pointer input to the shot
+ * Thin scene: draws the course and ball, forwards pointer input to the shot
  * logic and advances the physics in fixed slices.
  */
 export class PlayScene extends Phaser.Scene {
-  private readonly course: Course = emptyCourse();
+  private readonly course: Course = hole1();
   private ball: Ball = { x: 0, y: 0, vx: 0, vy: 0 };
+  private flags: HoleFlags = freshHoleFlags();
   private accumulator = 0;
 
+  private courseView!: CourseView;
   private ballSprite!: Phaser.GameObjects.Arc;
   private aimDot!: Phaser.GameObjects.Arc;
   private aimLine!: Phaser.GameObjects.Graphics;
@@ -45,10 +46,14 @@ export class PlayScene extends Phaser.Scene {
   create(): void {
     this.cameras.main.setBackgroundColor(COLOURS.background);
 
-    this.ball = { x: this.course.width / 2, y: this.course.height / 2, vx: 0, vy: 0 };
+    const tee = rectCentre(this.course.start);
+    this.ball = { x: tee.x, y: tee.y, vx: 0, vy: 0 };
+    this.flags = freshHoleFlags();
     this.accumulator = 0;
 
-    this.drawCourt();
+    this.courseView = new CourseView(this, this.course, COURSE_ORIGIN.x, COURSE_ORIGIN.y);
+    this.add.existing(this.courseView);
+    this.courseView.setFlags(this.flags);
 
     this.ballSprite = this.add
       .circle(0, 0, BALL_RADIUS, COLOURS.ball)
@@ -75,10 +80,13 @@ export class PlayScene extends Phaser.Scene {
 
   override update(_time: number, deltaMs: number): void {
     this.accumulator += Math.min(deltaMs / 1000, MAX_FRAME_DT);
+    let stepped = false;
     while (this.accumulator >= FIXED_DT) {
-      stepBall(this.ball, this.course, FIXED_DT);
+      stepBall(this.ball, this.course, FIXED_DT, this.flags);
       this.accumulator -= FIXED_DT;
+      stepped = true;
     }
+    if (stepped) this.courseView.setFlags(this.flags);
     this.syncBallSprite();
   }
 
@@ -89,19 +97,6 @@ export class PlayScene extends Phaser.Scene {
 
   isBallAtRest(): boolean {
     return isAtRest(this.ball, this.course);
-  }
-
-  private drawCourt(): void {
-    const g = this.add.graphics().setName('court');
-    g.fillStyle(COLOURS.border, 1);
-    g.fillRect(
-      COURSE_ORIGIN.x - BORDER,
-      COURSE_ORIGIN.y - BORDER,
-      this.course.width + BORDER * 2,
-      this.course.height + BORDER * 2,
-    );
-    g.fillStyle(COLOURS.court, 1);
-    g.fillRect(COURSE_ORIGIN.x, COURSE_ORIGIN.y, this.course.width, this.course.height);
   }
 
   private syncBallSprite(): void {

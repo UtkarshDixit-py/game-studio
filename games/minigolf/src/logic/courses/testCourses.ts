@@ -25,6 +25,8 @@ const copyStar = (star: Readonly<Star>): Star => ({ ...star });
 
 /** Open 400x560 court, tee at the bottom, hole exactly in the centre. */
 export const openCourt = (): Course => ({
+  name: 'Open court',
+  cap: 5,
   width: COURSE_WIDTH,
   height: COURSE_HEIGHT,
   walls: [],
@@ -43,6 +45,8 @@ export const WALL_COURT_WALL: Readonly<Rect> = { x: 200, y: 230, w: 20, h: 100 }
 
 /** Court with one 20x100 interior wall; the hole is tucked in the top-right corner. */
 export const wallCourt = (): Course => ({
+  name: 'Wall court',
+  cap: 5,
   width: COURSE_WIDTH,
   height: COURSE_HEIGHT,
   walls: [{ ...WALL_COURT_WALL }],
@@ -61,6 +65,8 @@ export const SAND_COURT_STRIP: Readonly<Rect> = { x: 150, y: 0, w: 100, h: COURS
 
 /** Court with a full-height sand strip 100 units wide; the hole is in the top-right corner. */
 export const sandCourt = (): Course => ({
+  name: 'Sand court',
+  cap: 5,
   width: COURSE_WIDTH,
   height: COURSE_HEIGHT,
   walls: [],
@@ -79,6 +85,8 @@ export const WATER_COURT_POND: Readonly<Rect> = { x: 100, y: 200, w: 200, h: 100
 
 /** Court with one pond between the tee and the top edge; the hole is in the top-right corner. */
 export const waterCourt = (): Course => ({
+  name: 'Water court',
+  cap: 5,
   width: COURSE_WIDTH,
   height: COURSE_HEIGHT,
   walls: [],
@@ -97,6 +105,8 @@ export const CONVEYOR_COURT_BELT: Readonly<Conveyor> = { rect: { x: 150, y: 300,
 
 /** Court with one up-conveyor and plenty of open grass above it. */
 export const conveyorCourt = (): Course => ({
+  name: 'Conveyor court',
+  cap: 5,
   width: COURSE_WIDTH,
   height: COURSE_HEIGHT,
   walls: [],
@@ -115,6 +125,8 @@ export const DOWN_CONVEYOR_COURT_BELT: Readonly<Conveyor> = { rect: { x: 150, y:
 
 /** Court with one short down-conveyor; balls approach it from below. */
 export const downConveyorCourt = (): Course => ({
+  name: 'Down conveyor court',
+  cap: 5,
   width: COURSE_WIDTH,
   height: COURSE_HEIGHT,
   walls: [],
@@ -138,6 +150,8 @@ export const PING_PONG_COURT_BELTS: readonly Readonly<Conveyor>[] = [PING_PONG_C
 
 /** Court whose two facing conveyors never let a ball rest; only the roll timeout stops it. */
 export const pingPongCourt = (): Course => ({
+  name: 'Ping-pong court',
+  cap: 5,
   width: COURSE_WIDTH,
   height: COURSE_HEIGHT,
   walls: [],
@@ -162,6 +176,8 @@ export const PORTAL_COURT_PORTALS: readonly Readonly<Portal>[] = [PORTAL_COURT_A
 
 /** Court with one portal pair at mid-height and nothing else in the way. */
 export const portalCourt = (): Course => ({
+  name: 'Portal court',
+  cap: 5,
   width: COURSE_WIDTH,
   height: COURSE_HEIGHT,
   walls: [],
@@ -180,6 +196,8 @@ export const PROP_COURT_PROP: Readonly<Prop> = { id: 'crate', rect: { x: 200, y:
 
 /** Court with one breakable prop standing upright in the middle. */
 export const propCourt = (): Course => ({
+  name: 'Prop court',
+  cap: 5,
   width: COURSE_WIDTH,
   height: COURSE_HEIGHT,
   walls: [],
@@ -198,6 +216,8 @@ export const STAR_COURT_STAR: Readonly<Star> = { id: 'star1', x: 200, y: 280, r:
 
 /** Court with one star in the middle and nothing else. */
 export const starCourt = (): Course => ({
+  name: 'Star court',
+  cap: 5,
   width: COURSE_WIDTH,
   height: COURSE_HEIGHT,
   walls: [],
