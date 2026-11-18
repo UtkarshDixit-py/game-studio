@@ -3,8 +3,8 @@
 A lean monorepo for shipping small mobile games as separate Play Store apps.
 Phaser 3 + TypeScript + Vite, npm workspaces, Vitest, Playwright. One orchestrator
 agent (Claude Code) runs architect / developer / tester agents to build each game;
-every passing task is committed and pushed, and every push to `main` deploys a
-playable browser build to GitHub Pages.
+every passing task is committed and pushed. The repo is private, so you test on
+your phone from the local dev server over Wi-Fi (section 3).
 
 ```
 packages/core/       @studio/core: bootstrap (FIT, multi-touch), save, maths, synth audio, BigButton
@@ -12,7 +12,7 @@ games/minigolf/      Mini Golf skeleton
 games/botbrawl/      Bot Brawl skeleton
 scripts/             studio.sh (tmux cockpit), ship-task.sh, board.sh
 .claude/             CLAUDE.md is the orchestrator; agents/ has architect, developer, tester
-.github/workflows/   ci.yml, pages.yml
+.github/workflows/   ci.yml, pages.yml (manual only while the repo is private)
 ```
 
 ## 1. Prerequisites
@@ -32,7 +32,9 @@ npm run e2e        # Playwright smoke tests, phone viewport, all games
 npm run dev -w games/minigolf   # local dev server, open the URL on your phone (same Wi-Fi)
 ```
 
-## 3. Create the GitHub repo and enable Pages
+## 3. GitHub repo and testing on your phone
+
+The repo is private on GitHub. To recreate it from scratch:
 
 ```sh
 git add -A
@@ -40,14 +42,24 @@ git commit -m "studio scaffold"
 gh repo create <your-user>/game-studio --private --source=. --remote=origin --push
 ```
 
-Then in the GitHub repo: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
-The `pages` workflow runs on every push to `main` and publishes:
+**Phone testing (private repo).** Phone and Mac on the same Wi-Fi:
 
-- `https://<your-user>.github.io/game-studio/` index page listing every game
-- `https://<your-user>.github.io/game-studio/minigolf/`, `/botbrawl/`, ...
+```sh
+npm run dev -w games/minigolf        # live reload while a task is in progress
+# or the production build, exactly what ships:
+npm run build -w games/minigolf && npm run preview -w games/minigolf
+```
 
-Open these on your phone to test. Builds use `base: './'` so they work from any
-sub-folder, and later inside Capacitor's WebView without changes.
+Vite prints a `Network: http://<mac-ip>:<port>/` line. Open that URL on the phone.
+If it does not load, the Wi-Fi is isolating devices (common on office and guest
+networks); use the phone's hotspot for the Mac instead, and allow incoming
+connections for `node` if macOS asks.
+
+**GitHub Pages is off.** Pages needs a public repo on the free plan, so
+`pages.yml` is manual-only. To switch it on later, make the repo public, set
+**Settings → Pages → Source: GitHub Actions**, and restore the `push` trigger
+noted at the top of `.github/workflows/pages.yml`. Builds use `base: './'`, so
+they work from a Pages sub-folder and inside Capacitor's WebView unchanged.
 
 ## 4. Start the studio
 
@@ -96,7 +108,7 @@ agent. If teammate panes do not appear:
    in a separate tmux session; Claude prints the attach command.
 3. **Fallback:** remove the `env` block (or set the variable to `0`). The
    orchestrator then runs architect/developer/tester as ordinary in-process
-   subagents. Everything else (loop, shipping, Pages) works the same; you just see
+   subagents. Everything else (loop, shipping) works the same; you just see
    their output summarised in the orchestrator pane instead of separate panes.
    Press Up/Down then Enter in the orchestrator pane to open a subagent's transcript.
 
@@ -110,8 +122,7 @@ teams, `/resume` does not restore in-process teammates.
 3. Orchestrator spawns **tester** (haiku), which adds/runs Vitest + Playwright tests
    and replies `PASS` or `FAIL` with evidence. It never edits `src/`.
 4. On `PASS`, orchestrator runs `scripts/ship-task.sh "<game>: T## <title>"`, which
-   re-runs `npm run check`, commits, and pushes the current branch. CI runs; a push
-   to `main` also redeploys Pages.
+   re-runs `npm run check`, commits, and pushes the current branch. CI runs on every push.
 5. On `FAIL`, back to step 1 with the evidence, at most 3 times, then it asks you.
 
 Permissions in `.claude/settings.json` allow npm/npx, `git add/commit`, and
@@ -126,7 +137,7 @@ rm -rf games/<name>/node_modules games/<name>/dist
 
 Edit `games/<name>/package.json` (name `@games/<name>`, a free `dev` port),
 `src/logic/config.ts` (id and title) and `index.html` (title). Run `npm install`.
-Playwright, CI and Pages pick up every folder under `games/` automatically. Then
+Playwright and CI pick up every folder under `games/` automatically. Then
 hand the idea to the orchestrator and let the architect write SPEC.md and TASKS.md.
 
 ## 7. Android later
