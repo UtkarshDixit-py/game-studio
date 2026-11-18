@@ -2,7 +2,7 @@
 // Fixed-step and deterministic: the same inputs always give bitwise-identical
 // positions.
 import type { Vec2 } from '@studio/core';
-import { rectCentre, type Conveyor, type ConveyorDir, type Course, type Rect } from './course';
+import { rectCentre, type Conveyor, type ConveyorDir, type Course, type Portal, type Rect } from './course';
 
 export interface Ball {
   x: number;
@@ -15,10 +15,28 @@ export interface Ball {
   shotOrigin?: Vec2;
   /** Seconds the ball has rolled since the current shot. Reset by each shot. */
   rollTime?: number;
+  /**
+   * Set when the ball comes out of a portal. While locked the ball ignores
+   * every portal; the lock clears once the ball's centre is outside all of them.
+   */
+  portalLock?: boolean;
 }
 
+/**
+ * What has already happened on this hole. Shared by both players and across
+ * shots: broken props stay broken and collected stars stay gone until the
+ * next hole. `stepBall` appends to these arrays, never removes.
+ */
+export interface HoleFlags {
+  brokenProps: string[];
+  collectedStars: string[];
+}
+
+/** Flags for a hole nobody has played yet. */
+export const freshHoleFlags = (): HoleFlags => ({ brokenProps: [], collectedStars: [] });
+
 /** Things that happened during one `stepBall` call, for sound and HUD. */
-export type BallEvent = 'wall' | 'holed' | 'water' | 'timeout';
+export type BallEvent = 'wall' | 'holed' | 'water' | 'timeout' | 'portal' | 'break' | 'star';
 
 /** Simulation step in seconds. */
 export const FIXED_DT = 1 / 120;
@@ -29,6 +47,10 @@ export const FRICTION_GRASS = 240;
 export const FRICTION_SAND = 1200;
 /** Fraction of the normal velocity kept after hitting a wall. */
 export const WALL_RESTITUTION = 0.85;
+/** Fraction of the normal velocity kept after breaking a prop. */
+export const PROP_RESTITUTION = 0.5;
+/** Distance from the exit portal's centre at which the ball reappears. */
+export const PORTAL_EXIT_OFFSET = 23;
 /** Below this speed the ball snaps to rest (velocity exactly 0). */
 export const REST_SPEED = 5;
 /** Faster than this and the ball rolls over the hole instead of dropping in. */
@@ -66,6 +88,14 @@ export const isInWater = (ball: Ball, course: Course): boolean =>
 export const conveyorAt = (ball: Ball, course: Course): Conveyor | undefined =>
   course.conveyors.find((belt) => containsPoint(belt.rect, ball.x, ball.y));
 
+/** True when the ball's centre is strictly inside the circle. */
+const centreInCircle = (ball: Ball, c: { x: number; y: number; r: number }): boolean =>
+  Math.hypot(ball.x - c.x, ball.y - c.y) < c.r;
+
+/** The portal whose circle holds the ball's centre, if any (first match wins). */
+export const portalAt = (ball: Ball, course: Course): Portal | undefined =>
+  course.portals.find((portal) => centreInCircle(ball, portal));
+
 /** Velocity of the belt surface for a conveyor direction (+y is down). */
 export const beltVelocity = (dir: ConveyorDir): Vec2 => {
   switch (dir) {
@@ -85,8 +115,9 @@ const STILL: Readonly<Vec2> = { x: 0, y: 0 };
 /**
  * Advances the ball by `dt` seconds: linear friction (grass or sand, decided by
  * where the centre is at the start of the step), rest snap, collision with the
- * playfield edges and interior walls, water reset, hole capture, then the roll
- * timeout. Mutates `ball` and returns the events of this step.
+ * playfield edges, interior walls and unbroken props, portal teleport, water
+ * reset, star pickup, hole capture, then the roll timeout. Mutates `ball`,
+ * appends to `flags` and returns the events of this step.
  *
  * Friction acts on the velocity relative to the ground. Off a conveyor the
  * ground is still; on one it is the belt, so the ball never rests there but
@@ -94,8 +125,11 @@ const STILL: Readonly<Vec2> = { x: 0, y: 0 };
  *
  * Friction is applied first, then collisions reflect what is left, so on the
  * contact step `vx_after = 0.85 * (|vx_before| - FRICTION_GRASS * dt)`.
+ *
+ * `flags` defaults to a throwaway fresh set, so callers without props or stars
+ * can leave it out; anyone with them must pass the hole's shared flags.
  */
-export const stepBall = (ball: Ball, course: Course, dt: number): BallEvent[] => {
+export const stepBall = (ball: Ball, course: Course, dt: number, flags: HoleFlags = freshHoleFlags()): BallEvent[] => {
   if (ball.holed) return [];
   const conveyor = conveyorAt(ball, course);
   const speed = Math.hypot(ball.vx, ball.vy);
@@ -131,9 +165,19 @@ export const stepBall = (ball: Ball, course: Course, dt: number): BallEvent[] =>
 
   let hitWall = collideEdges(ball, course);
   for (const wall of course.walls) {
-    if (collideRect(ball, wall)) hitWall = true;
+    if (collideRect(ball, wall, WALL_RESTITUTION)) hitWall = true;
   }
   if (hitWall) events.push('wall');
+
+  for (const prop of course.props) {
+    if (flags.brokenProps.includes(prop.id)) continue;
+    if (collideRect(ball, prop.rect, PROP_RESTITUTION)) {
+      flags.brokenProps.push(prop.id);
+      events.push('break');
+    }
+  }
+
+  if (teleportThroughPortal(ball, course)) events.push('portal');
 
   if (isInWater(ball, course)) {
     const origin = ball.shotOrigin ?? rectCentre(course.start);
@@ -145,6 +189,14 @@ export const stepBall = (ball: Ball, course: Course, dt: number): BallEvent[] =>
     return events;
   }
 
+  for (const star of course.stars) {
+    if (flags.collectedStars.includes(star.id)) continue;
+    if (centreInCircle(ball, star)) {
+      flags.collectedStars.push(star.id);
+      events.push('star');
+    }
+  }
+
   if (captureInHole(ball, course)) events.push('holed');
 
   if (ball.rollTime >= MAX_ROLL_SECONDS && !isAtRest(ball)) {
@@ -154,6 +206,38 @@ export const stepBall = (ball: Ball, course: Course, dt: number): BallEvent[] =>
   }
 
   return events;
+};
+
+/**
+ * Portal handling for one step. A ball that just came out of a portal is
+ * locked until its centre is outside every portal; after that, entering a
+ * portal moves the ball to its pair's exit point, `PORTAL_EXIT_OFFSET` along
+ * the pair's `exitDir`, keeping its speed but heading along `exitDir`.
+ * Returns true when the ball was teleported.
+ */
+const teleportThroughPortal = (ball: Ball, course: Course): boolean => {
+  if (course.portals.length === 0) return false;
+  const inside = portalAt(ball, course);
+  if (ball.portalLock) {
+    if (inside) return false;
+    ball.portalLock = false;
+    return false;
+  }
+  if (!inside) return false;
+  const exit = course.portals.find((portal) => portal.id === inside.pair);
+  if (!exit) return false;
+
+  const speed = Math.hypot(ball.vx, ball.vy);
+  const dirLen = Math.hypot(exit.exitDir.x, exit.exitDir.y);
+  if (dirLen === 0) return false;
+  const dx = exit.exitDir.x / dirLen;
+  const dy = exit.exitDir.y / dirLen;
+  ball.x = exit.x + dx * PORTAL_EXIT_OFFSET;
+  ball.y = exit.y + dy * PORTAL_EXIT_OFFSET;
+  ball.vx = dx * speed;
+  ball.vy = dy * speed;
+  ball.portalLock = true;
+  return true;
 };
 
 /**
@@ -204,9 +288,10 @@ const collideEdges = (ball: Ball, course: Course): boolean => {
 /**
  * Circle vs solid axis-aligned rectangle. The ball is pushed out along the
  * normal from the closest point of the rectangle and its normal velocity
- * component is reflected and damped. Returns true when the wall was touched.
+ * component is reflected and damped by `restitution`. Returns true when the
+ * rectangle was touched.
  */
-const collideRect = (ball: Ball, rect: Rect): boolean => {
+const collideRect = (ball: Ball, rect: Rect, restitution: number): boolean => {
   const r = BALL_RADIUS;
   const left = rect.x;
   const right = rect.x + rect.w;
@@ -250,7 +335,7 @@ const collideRect = (ball: Ball, rect: Rect): boolean => {
   const vn = ball.vx * nx + ball.vy * ny;
   if (vn < 0) {
     // Remove the inward normal component and add back the damped reflection.
-    const k = -(1 + WALL_RESTITUTION) * vn;
+    const k = -(1 + restitution) * vn;
     ball.vx += nx * k;
     ball.vy += ny * k;
   }

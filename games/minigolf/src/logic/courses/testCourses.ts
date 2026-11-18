@@ -1,5 +1,17 @@
 // Small course fixtures for unit tests. Pure data, no Phaser.
-import { COURSE_HEIGHT, COURSE_WIDTH, HOLE_RADIUS, type Conveyor, type Course, type Rect } from '../course';
+import {
+  COURSE_HEIGHT,
+  COURSE_WIDTH,
+  HOLE_RADIUS,
+  PORTAL_RADIUS,
+  STAR_RADIUS,
+  type Conveyor,
+  type Course,
+  type Portal,
+  type Prop,
+  type Rect,
+  type Star,
+} from '../course';
 
 const bottomStart = (): Rect => ({ x: COURSE_WIDTH / 2 - 20, y: COURSE_HEIGHT - 100, w: 40, h: 40 });
 
@@ -7,6 +19,9 @@ const bottomStart = (): Rect => ({ x: COURSE_WIDTH / 2 - 20, y: COURSE_HEIGHT - 
 const cornerHole = () => ({ x: COURSE_WIDTH - 40, y: 40, r: HOLE_RADIUS });
 
 const copyConveyor = (belt: Readonly<Conveyor>): Conveyor => ({ rect: { ...belt.rect }, dir: belt.dir });
+const copyPortal = (portal: Readonly<Portal>): Portal => ({ ...portal, exitDir: { ...portal.exitDir } });
+const copyProp = (prop: Readonly<Prop>): Prop => ({ id: prop.id, rect: { ...prop.rect } });
+const copyStar = (star: Readonly<Star>): Star => ({ ...star });
 
 /** Open 400x560 court, tee at the bottom, hole exactly in the centre. */
 export const openCourt = (): Course => ({
@@ -16,6 +31,9 @@ export const openCourt = (): Course => ({
   sand: [],
   water: [],
   conveyors: [],
+  portals: [],
+  props: [],
+  stars: [],
   hole: { x: COURSE_WIDTH / 2, y: COURSE_HEIGHT / 2, r: HOLE_RADIUS },
   start: bottomStart(),
 });
@@ -31,6 +49,9 @@ export const wallCourt = (): Course => ({
   sand: [],
   water: [],
   conveyors: [],
+  portals: [],
+  props: [],
+  stars: [],
   hole: cornerHole(),
   start: bottomStart(),
 });
@@ -46,6 +67,9 @@ export const sandCourt = (): Course => ({
   sand: [{ ...SAND_COURT_STRIP }],
   water: [],
   conveyors: [],
+  portals: [],
+  props: [],
+  stars: [],
   hole: cornerHole(),
   start: bottomStart(),
 });
@@ -61,6 +85,9 @@ export const waterCourt = (): Course => ({
   sand: [],
   water: [{ ...WATER_COURT_POND }],
   conveyors: [],
+  portals: [],
+  props: [],
+  stars: [],
   hole: cornerHole(),
   start: bottomStart(),
 });
@@ -76,6 +103,9 @@ export const conveyorCourt = (): Course => ({
   sand: [],
   water: [],
   conveyors: [copyConveyor(CONVEYOR_COURT_BELT)],
+  portals: [],
+  props: [],
+  stars: [],
   hole: cornerHole(),
   start: bottomStart(),
 });
@@ -91,6 +121,9 @@ export const downConveyorCourt = (): Course => ({
   sand: [],
   water: [],
   conveyors: [copyConveyor(DOWN_CONVEYOR_COURT_BELT)],
+  portals: [],
+  props: [],
+  stars: [],
   hole: cornerHole(),
   start: bottomStart(),
 });
@@ -111,6 +144,69 @@ export const pingPongCourt = (): Course => ({
   sand: [],
   water: [],
   conveyors: PING_PONG_COURT_BELTS.map(copyConveyor),
+  portals: [],
+  props: [],
+  stars: [],
+  hole: cornerHole(),
+  start: bottomStart(),
+});
+
+/**
+ * The portal pair of `portalCourt`: A on the left half of the court, B on the
+ * right. A ball entering A comes out of B heading straight up; one entering B
+ * comes out of A heading straight down.
+ */
+export const PORTAL_COURT_A: Readonly<Portal> = { id: 'A', pair: 'B', x: 100, y: 280, r: PORTAL_RADIUS, exitDir: { x: 0, y: 1 } };
+export const PORTAL_COURT_B: Readonly<Portal> = { id: 'B', pair: 'A', x: 300, y: 280, r: PORTAL_RADIUS, exitDir: { x: 0, y: -1 } };
+export const PORTAL_COURT_PORTALS: readonly Readonly<Portal>[] = [PORTAL_COURT_A, PORTAL_COURT_B];
+
+/** Court with one portal pair at mid-height and nothing else in the way. */
+export const portalCourt = (): Course => ({
+  width: COURSE_WIDTH,
+  height: COURSE_HEIGHT,
+  walls: [],
+  sand: [],
+  water: [],
+  conveyors: [],
+  portals: PORTAL_COURT_PORTALS.map(copyPortal),
+  props: [],
+  stars: [],
+  hole: cornerHole(),
+  start: bottomStart(),
+});
+
+/** The single 20x100 breakable crate of `propCourt`, in the same spot as `WALL_COURT_WALL`. */
+export const PROP_COURT_PROP: Readonly<Prop> = { id: 'crate', rect: { x: 200, y: 230, w: 20, h: 100 } };
+
+/** Court with one breakable prop standing upright in the middle. */
+export const propCourt = (): Course => ({
+  width: COURSE_WIDTH,
+  height: COURSE_HEIGHT,
+  walls: [],
+  sand: [],
+  water: [],
+  conveyors: [],
+  portals: [],
+  props: [copyProp(PROP_COURT_PROP)],
+  stars: [],
+  hole: cornerHole(),
+  start: bottomStart(),
+});
+
+/** The single star of `starCourt`, dead centre of the court. */
+export const STAR_COURT_STAR: Readonly<Star> = { id: 'star1', x: 200, y: 280, r: STAR_RADIUS };
+
+/** Court with one star in the middle and nothing else. */
+export const starCourt = (): Course => ({
+  width: COURSE_WIDTH,
+  height: COURSE_HEIGHT,
+  walls: [],
+  sand: [],
+  water: [],
+  conveyors: [],
+  portals: [],
+  props: [],
+  stars: [copyStar(STAR_COURT_STAR)],
   hole: cornerHole(),
   start: bottomStart(),
 });
