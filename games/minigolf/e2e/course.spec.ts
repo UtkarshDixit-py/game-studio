@@ -4,10 +4,18 @@ import type Phaser from 'phaser';
 // Hole 1 renders through CourseView: the `course` container holds named tiles
 // and the shot-cap banner.
 
+/** Boots to the title screen and taps Play, landing in the Play scene. */
 const waitForPlay = async (page: Page) => {
   await page.goto('/');
   await page.waitForFunction(() => window.__GAME__?.isBooted === true);
   await expect(page.locator('canvas')).toBeVisible();
+  await page.waitForFunction(() => window.__GAME__!.scene.isActive('Title'));
+  const button = await page.evaluate(() => {
+    const b = window.__GAME__!.scene.getScene('Title').children.getByName('playButton') as Phaser.GameObjects.Container;
+    return { x: b.x, y: b.y };
+  });
+  const box = (await page.locator('canvas').boundingBox())!;
+  await page.mouse.click(box.x + (button.x / 480) * box.width, box.y + (button.y / 800) * box.height);
   await page.waitForFunction(() => window.__GAME__!.scene.isActive('Play'));
 };
 

@@ -15,8 +15,14 @@ import {
 } from '../logic/match';
 import { createAiOpponent, type Opponent } from '../logic/opponent';
 import { BALL_RADIUS, FIXED_DT, isAtRest, type Ball, type HoleFlags } from '../logic/physics';
+import { createMinigolfSave, recordResult, type MinigolfSaveStore } from '../logic/save';
 import { shotFromDrag, type Shot } from '../logic/shot';
 import { CourseView } from './CourseView';
+
+/** Scene data for `Play`: pass `resume` to pick up a saved match. */
+export interface PlaySceneData {
+  resume?: MatchState;
+}
 
 /** Where the course's top-left corner sits on the 480x800 screen. */
 export const COURSE_ORIGIN = { x: 40, y: 150 } as const;
@@ -101,6 +107,9 @@ export class PlayScene extends Phaser.Scene {
   /** The course of the current hole: `holes[state.holeIndex]`. */
   private course!: Course;
   private readonly opponent: Opponent = createAiOpponent();
+  private readonly save: MinigolfSaveStore = createMinigolfSave();
+  /** Saved match handed in through scene data, consumed by `create`. */
+  private resume: MatchState | null = null;
 
   private state!: MatchState;
   private accumulator = 0;
@@ -131,12 +140,21 @@ export class PlayScene extends Phaser.Scene {
     super('Play');
   }
 
+  init(data?: PlaySceneData): void {
+    this.resume = data?.resume ?? null;
+  }
+
   create(): void {
     this.cameras.main.setBackgroundColor(COLOURS.background);
 
-    this.state = createMatch(seedFromUrl(), this.holes, holeIndexFromUrl());
+    // A resumed match is copied so the scene never mutates the save's object.
+    this.state = this.resume
+      ? (JSON.parse(JSON.stringify(this.resume)) as MatchState)
+      : createMatch(seedFromUrl(), this.holes, holeIndexFromUrl());
+    this.resume = null;
     this.accumulator = 0;
-    this.rolling = false;
+    // Saves never hold a roll, but if one did, let `update` settle and save it.
+    this.rolling = this.state.phase === 'rolling';
     this.aiBusy = false;
     this.dragStart = null;
     this.pendingShot = null;
@@ -202,6 +220,7 @@ export class PlayScene extends Phaser.Scene {
     if (this.rolling && this.state.phase !== 'rolling') {
       this.rolling = false;
       this.afterStateChange();
+      this.persist();
     }
   }
 
@@ -226,6 +245,21 @@ export class PlayScene extends Phaser.Scene {
 
   private flags(): HoleFlags {
     return { brokenProps: this.state.hole.brokenProps, collectedStars: this.state.hole.collectedStars };
+  }
+
+  /**
+   * Writes the match to the save. Called only once the match has settled:
+   * after a turn (including into `holeOver`) and after Continue. Never during
+   * a roll. At match over the result is recorded and `inProgress` cleared.
+   */
+  private persist(): void {
+    const { phase } = this.state;
+    if (phase === 'rolling') return;
+    if (phase === 'matchOver') {
+      recordResult(this.save, matchWinner(this.state));
+      return;
+    }
+    this.save.set({ inProgress: this.getState() });
   }
 
   /**
@@ -300,10 +334,12 @@ export class PlayScene extends Phaser.Scene {
       this.courseView?.setFlags(this.flags());
     }
     this.afterStateChange();
+    this.persist();
   }
 
   private onPlayAgain(): void {
-    this.scene.restart();
+    // Fresh data so a resumed match is not resumed again.
+    this.scene.restart({} satisfies PlaySceneData);
   }
 
   // --------------------------------------------------------------------- input

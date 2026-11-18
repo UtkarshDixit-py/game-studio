@@ -4,17 +4,25 @@ import type Phaser from 'phaser';
 // Smoke: the game boots in a phone viewport, a tap places the ball, a pull-back
 // drag shows the aim HUD, and releasing rolls the ball until friction stops it.
 
-const waitForPlay = async (page: Page) => {
-  await page.goto('/');
-  await page.waitForFunction(() => window.__GAME__?.isBooted === true);
-  await expect(page.locator('canvas')).toBeVisible();
-  await page.waitForFunction(() => window.__GAME__!.scene.isActive('Play'));
-};
-
 /** Maps a 480x800 design point to a page point through the FIT-scaled canvas. */
 const toPage = async (page: Page, x: number, y: number) => {
   const box = (await page.locator('canvas').boundingBox())!;
   return { x: box.x + (x / 480) * box.width, y: box.y + (y / 800) * box.height };
+};
+
+/** Boots to the title screen and taps Play, landing in the Play scene. */
+const waitForPlay = async (page: Page) => {
+  await page.goto('/');
+  await page.waitForFunction(() => window.__GAME__?.isBooted === true);
+  await expect(page.locator('canvas')).toBeVisible();
+  await page.waitForFunction(() => window.__GAME__!.scene.isActive('Title'));
+  const button = await page.evaluate(() => {
+    const b = window.__GAME__!.scene.getScene('Title').children.getByName('playButton') as Phaser.GameObjects.Container;
+    return { x: b.x, y: b.y };
+  });
+  const { x, y } = await toPage(page, button.x, button.y);
+  await page.mouse.click(x, y);
+  await page.waitForFunction(() => window.__GAME__!.scene.isActive('Play'));
 };
 
 /** Taps the centre of hole 1's start zone (course 56,504 → screen 96,654). */
