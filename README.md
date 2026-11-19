@@ -2,8 +2,7 @@
 
 An open-source monorepo for building small mobile web games with Phaser 3 and
 TypeScript, where one Claude Code orchestrator runs architect, developer and
-tester agents to build each game task by task. Every game is a portrait,
-touch-only web app that can later be wrapped as an Android app.
+tester agents to build each game task by task. Games support portrait touch play. Putt Duel also has a desktop layout with mouse controls.
 
 **Play the games:** https://games-ten-steel.vercel.app
 
@@ -27,9 +26,11 @@ https://games-ten-steel.vercel.app/minigolf/mechanics.html.
 
 ```
 packages/core/       @studio/core: bootstrap (FIT scaling, multi-touch), save data, maths, synth audio, BigButton
+packages/ui/         @studio/ui: shared styles, fonts and game controls
 games/minigolf/      Putt Duel
 games/botbrawl/      Bot Brawl skeleton
 scripts/             studio.sh (tmux cockpit), ship-task.sh, board.sh, build-site.sh, deploy-site.sh
+scripts/site/        authored launcher shell and stylesheet
 CLAUDE.md            instructions for the orchestrator agent
 .claude/agents/      architect, developer and tester agent definitions
 .github/workflows/   ci.yml (check + browser tests on every push), pages.yml (optional, manual)
@@ -37,7 +38,7 @@ vercel.json          build and hosting config for the live site
 ```
 
 Stack: Phaser 3, TypeScript, Vite, npm workspaces, Vitest for unit tests,
-Playwright for browser tests in a phone viewport.
+Playwright for desktop, phone and assembled site tests.
 
 ## Quick start
 
@@ -49,9 +50,12 @@ cd game-studio
 npm install
 npx playwright install chromium
 npm run check                   # typecheck + unit tests + build every game
-npm run e2e                     # Playwright tests, phone viewport, all games
+bash scripts/build-site.sh      # assemble the launcher, games and mechanics page
+npm run e2e                     # Playwright tests for games and the assembled site
 npm run dev -w games/minigolf   # local dev server with live reload
 ```
+
+The shared UI package bundles Nunito Sans under the [SIL Open Font License](packages/ui/src/assets/fonts/OFL.txt).
 
 ### Testing on a phone
 

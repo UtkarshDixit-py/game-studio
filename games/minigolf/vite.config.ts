@@ -7,5 +7,8 @@ export default defineConfig({
   build: {
     target: 'es2022',
     sourcemap: false,
+    // Phaser's SVG loader treats inline SVG data URLs as base64; keep every
+    // art asset external so imports resolve to real SVG/PNG/JPG URLs.
+    assetsInlineLimit: 0,
   },
 });

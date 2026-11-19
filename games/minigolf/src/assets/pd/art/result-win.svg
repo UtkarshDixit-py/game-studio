@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="200" viewBox="0 0 240 200"><defs>
+  <linearGradient id="pd-timber" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F2DFBC"/><stop offset="1" stop-color="#DDBF8D"/></linearGradient>
+  <radialGradient id="pd-turf" cx="0.5" cy="0.42" r="0.75"><stop offset="0" stop-color="#7AB36B"/><stop offset="1" stop-color="#6EA961"/></radialGradient>
+  <linearGradient id="pd-band" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset="0.5" stop-color="#fff" stop-opacity="0.05"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+  <pattern id="pd-mow" width="400" height="80" patternUnits="userSpaceOnUse"><rect width="400" height="80" fill="url(#pd-band)"/></pattern>
+  <linearGradient id="pd-shadeT" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1d2a14" stop-opacity="0.22"/><stop offset="1" stop-color="#1d2a14" stop-opacity="0"/></linearGradient>
+  <linearGradient id="pd-shadeL" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#1d2a14" stop-opacity="0.16"/><stop offset="1" stop-color="#1d2a14" stop-opacity="0"/></linearGradient>
+  <linearGradient id="pd-shadeR" x1="1" y1="0" x2="0" y2="0"><stop offset="0" stop-color="#1d2a14" stop-opacity="0.10"/><stop offset="1" stop-color="#1d2a14" stop-opacity="0"/></linearGradient>
+  <linearGradient id="pd-shadeB" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#1d2a14" stop-opacity="0.08"/><stop offset="1" stop-color="#1d2a14" stop-opacity="0"/></linearGradient>
+  <linearGradient id="pd-water" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4C9BCB"/><stop offset="1" stop-color="#3A84B6"/></linearGradient>
+  <pattern id="pd-ripple" width="28" height="18" patternUnits="userSpaceOnUse"><path d="M3 7q4.5-3.4 9 0M17 16q4.5-3.4 9 0" fill="none" stroke="#E2F3FA" stroke-opacity="0.75" stroke-width="1.3" stroke-linecap="round"/></pattern>
+  <radialGradient id="pd-sand" cx="0.5" cy="0.45" r="0.7"><stop offset="0" stop-color="#F2DAA6"/><stop offset="1" stop-color="#EBCF97"/></radialGradient>
+  <pattern id="pd-dots" width="8" height="8" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="0.8" fill="#C29C59"/><circle cx="6" cy="6" r="0.8" fill="#C29C59"/></pattern>
+  <pattern id="pd-slatX" width="8" height="8" patternUnits="userSpaceOnUse"><rect x="3.4" width="1.2" height="8" fill="#535B69"/></pattern>
+  <pattern id="pd-slatY" width="8" height="8" patternUnits="userSpaceOnUse"><rect y="3.4" width="8" height="1.2" fill="#535B69"/></pattern>
+  <linearGradient id="pd-rollX" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#7F8995"/><stop offset="0.45" stop-color="#B9C1CB"/><stop offset="1" stop-color="#7F8995"/></linearGradient>
+  <linearGradient id="pd-rollY" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7F8995"/><stop offset="0.45" stop-color="#B9C1CB"/><stop offset="1" stop-color="#7F8995"/></linearGradient>
+  <radialGradient id="pd-cup" cx="0.5" cy="0.38" r="0.62"><stop offset="0" stop-color="#3a342e"/><stop offset="1" stop-color="#171513"/></radialGradient>
+  <radialGradient id="pd-portal" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#D7CFFF"/><stop offset="1" stop-color="#5E4BC8"/></radialGradient>
+  <radialGradient id="pd-ballYou" cx="0.38" cy="0.32" r="0.75"><stop offset="0" stop-color="#ffffff"/><stop offset="0.7" stop-color="#F4F1EB"/><stop offset="1" stop-color="#E3DED5"/></radialGradient>
+  <radialGradient id="pd-ballBot" cx="0.38" cy="0.32" r="0.75"><stop offset="0" stop-color="#544D46"/><stop offset="1" stop-color="#2A2622"/></radialGradient>
+</defs><ellipse cx="120" cy="184" rx="78" ry="9" fill="#5b4526" fill-opacity="0.14"/><rect x="34" y="44" width="8" height="4" rx="2" fill="#F2B23E" transform="rotate(-40 38 46)"/><rect x="196" y="36" width="8" height="4" rx="2" fill="#0F7A68" transform="rotate(-3 200 38)"/><rect x="58" y="96" width="8" height="4" rx="2" fill="#C2563D" transform="rotate(34 62 98)"/><rect x="184" y="92" width="8" height="4" rx="2" fill="#F2B23E" transform="rotate(71 188 94)"/><rect x="96" y="22" width="8" height="4" rx="2" fill="#8775E4" transform="rotate(108 100 24)"/><rect x="150" y="18" width="8" height="4" rx="2" fill="#C2563D" transform="rotate(145 154 20)"/>
+    <path d="M86 40h68v34a34 34 0 0 1-68 0z" fill="#F5C242" stroke="#C4861A" stroke-width="2"/>
+    <path d="M86 50H70a14 14 0 0 0 18 20M154 50h16a14 14 0 0 1-18 20" fill="none" stroke="#C4861A" stroke-width="5" stroke-linecap="round"/>
+    <path d="M98 48v26a22 22 0 0 0 10 18" fill="none" stroke="#fff" stroke-opacity="0.55" stroke-width="5" stroke-linecap="round"/>
+    <rect x="112" y="106" width="16" height="26" fill="#C4861A"/>
+    <rect x="88" y="132" width="64" height="16" rx="5" fill="url(#pd-timber)" stroke="#A27D50" stroke-width="1.5"/>
+    <rect x="80" y="148" width="80" height="30" rx="7" fill="url(#pd-timber)" stroke="#A27D50" stroke-width="1.5"/>
+    <g transform="translate(120 58) scale(2.2) translate(-120 -58)"><g class="ball-you"><circle cx="120" cy="58" r="8" fill="url(#pd-ballYou)" stroke="#25211C" stroke-width="1.1"/><circle cx="117.4" cy="55.2" r="1.7" fill="#fff"/></g></g></svg>
