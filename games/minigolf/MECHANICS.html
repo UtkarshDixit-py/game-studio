@@ -1,92 +1,85 @@
 <title>Putt Duel Mechanics</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
-  /* Layout: one reading column, scorecard-style tables, three to-scale hole maps side by side. */
+  /* One theme, shared tokens, one reading column and scorecard-style tables. */
   :root {
-    --bg: #F5F7F4;
-    --surface: #FFFFFF;
-    --fg: #16201A;
-    --muted: #566259;
-    --line: #D3DAD4;
-    --tint: #E7EFE8;
-    --accent: #1E7443;
-    --on-accent: #FFFFFF;
-    --map-court: #2F7F4A;
-    --map-belt: #43A163;
-    --map-wall: #1F2426;
-    --map-water: #2E86D6;
-    --map-sand: #DCC48E;
-    --map-portal: #C39BFF;
-    --map-prop: #F28C28;
-    --map-star: #FFD23F;
-    --map-cup: #0A0D0B;
-    --map-flag: #E5484D;
-    --map-mark: #FFFFFF;
-    --font-display: "Barlow Condensed", "Arial Narrow", Arial, sans-serif;
-    --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
-    --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --bg: #0F1411; --surface: #161C18; --fg: #E4EAE5; --muted: #98A59B; --line: #2A332D;
-      --tint: #1C251F; --accent: #58BD7C; --on-accent: #0C130E; --map-wall: #2C3336;
-      color-scheme: dark;
-    }
-  }
-  :root[data-theme="dark"] {
-    --bg: #0F1411; --surface: #161C18; --fg: #E4EAE5; --muted: #98A59B; --line: #2A332D;
-    --tint: #1C251F; --accent: #58BD7C; --on-accent: #0C130E; --map-wall: #2C3336;
     color-scheme: dark;
+    --bg: var(--ui-background, #10141F);
+    --surface: var(--ui-surface, #1B2333);
+    --raised: var(--ui-raised, #263249);
+    --fg: var(--ui-text, #F4F7FF);
+    --muted: var(--ui-muted, #B8C4D9);
+    --line: var(--ui-separator, #34425B);
+    --tint: var(--ui-raised, #263249);
+    --accent: var(--ui-primary, #A99CFF);
+    --on-accent: var(--ui-on-primary, #17152B);
+    --map-court: var(--course-grass, #246342);
+    --map-belt: var(--course-belt, #39465F);
+    --map-wall: var(--course-wall, #172334);
+    --map-water: var(--course-water, #397EEB);
+    --map-sand: var(--course-sand, #D9BE85);
+    --map-portal: var(--course-portal, #BEA1FF);
+    --map-prop: var(--course-prop, #F0A45D);
+    --map-star: var(--course-star, #FFD76A);
+    --map-cup: var(--course-cup, #080D13);
+    --map-flag: var(--ui-error, #FF9AA8);
+    --map-mark: var(--ui-text, #F4F7FF);
+    --font-display: var(--ui-font, "Nunito Sans", system-ui, -apple-system, "Segoe UI", sans-serif);
+    --font-body: var(--ui-font, "Nunito Sans", system-ui, -apple-system, "Segoe UI", sans-serif);
+    --font-mono: var(--ui-font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
   }
 
   body {
+    margin: 0;
     background: var(--bg);
     color: var(--fg);
-    font: 15px/1.55 var(--font-body);
-    padding-block: 28px 64px;
+    font: 400 16px/24px var(--font-body);
+    padding-block: 24px 64px;
     padding-left: max(16px, env(safe-area-inset-left, 0px));
     padding-right: max(16px, env(safe-area-inset-right, 0px));
   }
-  .wrap { max-width: 880px; margin-inline: auto; display: grid; gap: 36px; }
+  .wrap { max-width: 880px; margin-inline: auto; display: grid; gap: 32px; }
   .wrap > * { min-width: 0; }
 
-  header { display: grid; gap: 10px; }
-  .eyebrow { font: 500 12px/1.4 var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin: 0; }
-  h1 { font: 600 clamp(38px, 8vw, 58px)/0.98 var(--font-display); letter-spacing: 0.01em; text-transform: uppercase; margin: 0; text-wrap: balance; }
-  .lede { margin: 0; max-width: 62ch; color: var(--muted); }
+  header { display: grid; gap: 8px; }
+  .eyebrow { font: 600 14px/20px var(--font-mono); letter-spacing: 0.02em; text-transform: uppercase; color: var(--muted); margin: 0; }
+  h1 { font: 800 40px/48px var(--font-display); letter-spacing: 0; margin: 0; text-wrap: balance; }
+  .lede { margin: 0; max-width: 62ch; color: var(--muted); font-size: 16px; line-height: 24px; }
 
-  section { border-top: 1px solid var(--line); padding-top: 18px; display: grid; gap: 14px; }
+  section { border-top: 1px solid var(--line); padding-top: 16px; display: grid; gap: 16px; }
   section > * { min-width: 0; }
-  h2 { font: 600 25px/1.1 var(--font-display); letter-spacing: 0.04em; text-transform: uppercase; margin: 0; }
-  h3 { font: 600 21px/1.1 var(--font-display); letter-spacing: 0.03em; text-transform: uppercase; margin: 0; }
-  p { margin: 0; max-width: 66ch; }
-  .note { color: var(--muted); font-size: 13.5px; }
-  ul { margin: 0; padding-left: 1.15em; display: grid; gap: 6px; max-width: 70ch; }
-  code { font: 0.9em var(--font-mono); background: var(--tint); padding: 1px 5px; border-radius: 3px; }
-  b { font-weight: 600; }
-  .n { font-family: var(--font-mono); font-size: 0.93em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  h2 { font: 700 32px/40px var(--font-display); letter-spacing: 0; margin: 0; }
+  h3 { font: 700 24px/32px var(--font-display); letter-spacing: 0; margin: 0; }
+  p { margin: 0; max-width: 66ch; font-size: 16px; line-height: 24px; }
+  .note { color: var(--muted); font-size: 14px; line-height: 20px; }
+  ul { margin: 0; padding-left: 1.15em; display: grid; gap: 8px; max-width: 70ch; }
+  li { font-size: 16px; line-height: 24px; }
+  code { font: 400 14px/20px var(--font-mono); background: var(--tint); color: var(--fg); padding: 1px 5px; border-radius: 4px; }
+  b { font-weight: 700; }
+  .n { font-family: var(--font-mono); font-size: 14px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  a { color: var(--accent); }
+  a:focus-visible, button:focus-visible { outline: 3px solid var(--fg); outline-offset: 2px; }
 
-  .scroll { overflow-x: auto; }
-  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  .scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; line-height: 20px; }
   th, td { padding: 8px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
-  thead th { font: 500 11.5px/1.3 var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); vertical-align: bottom; }
+  thead th { font: 700 14px/20px var(--font-mono); letter-spacing: 0.02em; text-transform: uppercase; color: var(--muted); vertical-align: bottom; }
   .num { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
-  tbody th { font-weight: 500; }
+  tbody th { font-weight: 600; }
 
   /* The one loud element: a golf scorecard. */
-  .card { background: var(--surface); border: 1px solid var(--line); border-collapse: separate; border-spacing: 0; max-width: 560px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-collapse: separate; border-spacing: 0; max-width: 560px; border-radius: 8px; overflow: hidden; }
   .narrow { max-width: 560px; }
   .card th, .card td { text-align: center; border-right: 1px solid var(--line); }
   .card th:last-child, .card td:last-child { border-right: 0; }
   .card tr:last-child th, .card tr:last-child td { border-bottom: 0; }
-  .card thead th { background: var(--accent); color: var(--on-accent); font: 600 20px/1 var(--font-display); letter-spacing: 0.06em; padding-block: 9px; border-color: var(--accent); }
-  .card tbody th { text-align: left; font: 500 11.5px/1.3 var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+  .card thead th { background: var(--accent); color: var(--on-accent); font: 800 16px/20px var(--font-display); letter-spacing: 0.02em; text-transform: uppercase; padding-block: 9px; border-color: var(--accent); }
+  .card tbody th { text-align: left; font: 600 14px/20px var(--font-mono); letter-spacing: 0.02em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
   .card thead th:first-child { text-align: left; }
-  .card .big { font: 600 26px/1 var(--font-display); }
+  .card .big { font: 800 24px/28px var(--font-display); }
 
   dl { margin: 0; display: grid; grid-template-columns: minmax(140px, 190px) 1fr; border-top: 1px solid var(--line); }
-  dt, dd { margin: 0; padding: 10px 0; border-bottom: 1px solid var(--line); min-width: 0; }
+  dt, dd { margin: 0; padding: 10px 0; border-bottom: 1px solid var(--line); min-width: 0; font-size: 16px; line-height: 24px; }
   dt { font-weight: 600; display: flex; gap: 9px; align-items: baseline; padding-right: 16px; }
   dt svg { flex: none; width: 15px; height: 15px; position: relative; top: 2px; }
   @media (max-width: 560px) {
@@ -98,10 +91,10 @@
   .holes { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 28px 24px; }
   figure { margin: 0; display: grid; gap: 10px; align-content: start; min-width: 0; }
   figure svg { display: block; width: 100%; max-width: 330px; height: auto; }
-  figcaption { display: grid; gap: 6px; font-size: 14px; }
-  .meta { font: 500 12px/1.4 var(--font-mono); letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
-  .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--muted); list-style: none; padding: 0; max-width: none; }
-  .legend li { display: inline-flex; gap: 7px; align-items: center; }
+  figcaption { display: grid; gap: 6px; font-size: 14px; line-height: 20px; }
+  .meta { font: 600 14px/20px var(--font-mono); letter-spacing: 0.02em; text-transform: uppercase; color: var(--muted); }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 14px; line-height: 20px; color: var(--muted); list-style: none; padding: 0; max-width: none; }
+  .legend li { display: inline-flex; gap: 7px; align-items: center; font-size: 14px; line-height: 20px; }
   .legend svg { width: 15px; height: 15px; flex: none; }
 
   .m-border, .m-wall { fill: var(--map-wall); }
@@ -119,7 +112,7 @@
   .m-chev { fill: none; stroke: var(--map-mark); stroke-opacity: 0.75; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
   .m-arrow { stroke: var(--map-mark); stroke-width: 3; fill: none; }
   .m-arrowhead { fill: var(--map-mark); }
-  .m-label { fill: var(--map-mark); font: 600 19px var(--font-mono); }
+  .m-label { fill: var(--map-mark); font: 600 14px var(--font-mono); }
 </style>
 
 <div class="wrap">
@@ -132,7 +125,7 @@
   <section aria-labelledby="s-match">
     <h2 id="s-match">The match</h2>
     <p>Match play against a bot over three holes. Each hole is worth one point. Most points after hole 3 wins. Equal points is a draw.</p>
-    <div class="scroll">
+    <div class="scroll" role="region" aria-label="Match and hole points" tabindex="0">
       <table class="card">
         <thead>
           <tr><th scope="col">Hole</th><th scope="col">1</th><th scope="col">2</th><th scope="col">3</th></tr>
@@ -144,7 +137,7 @@
         </tbody>
       </table>
     </div>
-    <div class="scroll">
+    <div class="scroll" role="region" aria-label="Hole scoring" tabindex="0">
       <table class="narrow">
         <thead>
           <tr><th scope="col">How the hole ends</th><th scope="col" class="num">Winner</th><th scope="col" class="num">Other</th></tr>
@@ -178,7 +171,7 @@
       <li>Power is drag length divided by <span class="n">180 px</span>, capped at 100%. Releasing below 5% cancels the shot.</li>
       <li>Launch speed is power &times; <span class="n">640 u/s</span>. The aim line is power &times; <span class="n">120 px</span> long.</li>
     </ul>
-    <div class="scroll">
+    <div class="scroll" role="region" aria-label="Aiming power and roll" tabindex="0">
       <table>
         <thead>
           <tr>
@@ -199,7 +192,7 @@
 
   <section aria-labelledby="s-ball">
     <h2 id="s-ball">The ball</h2>
-    <div class="scroll">
+    <div class="scroll" role="region" aria-label="Ball and physics constants" tabindex="0">
       <table>
         <tbody>
           <tr><th scope="row">Simulation step</th><td class="num">1/120 s</td><td>Fixed. The same inputs always give the same result, to the last bit.</td></tr>
@@ -366,7 +359,7 @@
   <section aria-labelledby="s-bot">
     <h2 id="s-bot">The bot</h2>
     <p>The bot plays by the same physics as you. It has no hidden information and no speed or accuracy bonus. It picks a shot by trying many and keeping the best.</p>
-    <div class="scroll">
+    <div class="scroll" role="region" aria-label="Bot search and pacing" tabindex="0">
       <table>
         <tbody>
           <tr><th scope="row">Shots tried per turn</th><td class="num">144</td><td>36 directions, one every 10&deg;, at four powers: 30%, 55%, 80% and 100%. Each is rolled to rest with the real physics.</td></tr>
@@ -397,7 +390,7 @@
 
   <section aria-labelledby="s-src">
     <h2 id="s-src">Where each rule lives</h2>
-    <div class="scroll">
+    <div class="scroll" role="region" aria-label="Rule source files" tabindex="0">
       <table>
         <thead><tr><th scope="col">File in games/minigolf/src/logic</th><th scope="col">Holds</th></tr></thead>
         <tbody>

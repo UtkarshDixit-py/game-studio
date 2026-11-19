@@ -2,20 +2,83 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
-    />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="theme-color" content="#10141F" />
     <title>Putt Duel</title>
-    <style>
-      html, body { margin: 0; height: 100%; background: #000; overflow: hidden; touch-action: none; }
-      #app { width: 100%; height: 100%; }
-      canvas { display: block; }
-    </style>
   </head>
   <body>
-    <div id="app"></div>
+    <div class="ui-host" id="ui-host" aria-busy="true">
+      <div class="ui-stage" id="ui-stage"><div id="app"></div></div>
+      <aside class="ui-sidebar" id="ui-sidebar" aria-label="Game controls"></aside>
+    </div>
+    <div class="ui-overlay" id="ui-overlay"></div>
+    <div class="ui-startup" id="ui-startup">
+      <div class="ui-startup__inner">
+        <svg class="ui-startup__mark" viewBox="0 0 48 48" aria-hidden="true">
+          <circle cx="24" cy="24" r="19" fill="none" stroke="#F4F7FF" stroke-width="3" />
+          <circle cx="24" cy="24" r="5" fill="#080D13" />
+          <circle cx="16" cy="30" r="3" fill="#F4F7FF" />
+          <circle cx="32" cy="30" r="3" fill="none" stroke="#F4F7FF" stroke-width="2" />
+        </svg>
+        <p class="ui-startup__title">Putt Duel</p>
+        <p class="ui-startup__status" id="ui-startup-status" role="status" aria-live="polite" aria-atomic="true">Loading game…</p>
+        <div class="ui-startup__track" id="ui-startup-track" aria-hidden="true"><div class="ui-startup__bar"></div></div>
+        <button class="ui-startup__reload" id="ui-startup-reload" type="button" hidden>Reload</button>
+      </div>
+    </div>
+    <noscript><p style="padding: 24px; color: #f4f7ff">This game needs JavaScript. Enable it and reload.</p></noscript>
+    <script>
+      // Pre-bundle startup guard. This must run before the game module so a
+      // missing or slow bundle still gets an error/slow notice and Reload.
+      (function () {
+        var startup = document.getElementById('ui-startup');
+        var status = document.getElementById('ui-startup-status');
+        var reload = document.getElementById('ui-startup-reload');
+        var host = document.getElementById('ui-host');
+        var track = document.getElementById('ui-startup-track');
+        var timer = 0;
+        var done = false;
+        function setStatus(text) { if (status) status.textContent = text; }
+        function showReload() { if (reload) reload.hidden = false; }
+        function clearTimer() { if (timer) { clearTimeout(timer); timer = 0; } }
+        if (host) host.setAttribute('aria-busy', 'true');
+        function ready() {
+          if (done) return;
+          done = true;
+          clearTimer();
+          if (host) host.setAttribute('aria-busy', 'false');
+          if (status) {
+            status.removeAttribute('role');
+            status.removeAttribute('aria-live');
+            status.removeAttribute('aria-atomic');
+          }
+          if (startup) startup.hidden = true;
+        }
+        function fail() {
+          if (done) return;
+          done = true;
+          clearTimer();
+          if (host) host.setAttribute('aria-busy', 'false');
+          if (track) track.hidden = true;
+          setStatus('The game couldn’t load.');
+          showReload();
+        }
+        timer = setTimeout(function () {
+          if (done) return;
+          setStatus('Still loading…');
+          showReload();
+        }, Math.max(0, 8000 - performance.now()));
+        if (reload) reload.addEventListener('click', function () { location.reload(); });
+        document.addEventListener('error', function (event) {
+          var target = event.target;
+          if (target && target.tagName === 'SCRIPT') { fail(); return; }
+          if (!done && event.message) fail();
+        }, true);
+        window.addEventListener('unhandledrejection', function () { if (!done) fail(); });
+        window.__UI_STARTUP__ = { ready: ready, fail: fail };
+      })();
+    </script>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

@@ -21,9 +21,11 @@ jobs:
       - run: npm ci
       - name: Typecheck, unit tests, build
         run: npm run check
+      - name: Assemble static site
+        run: bash scripts/build-site.sh
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
-      - name: Playwright smoke (phone viewport)
+      - name: Playwright smoke (phone viewport and assembled site)
         run: npm run e2e
       - uses: actions/upload-artifact@v4
         if: failure()
