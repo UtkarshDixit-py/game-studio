@@ -1,0 +1,38 @@
+:root {
+  color-scheme: dark;
+  --ui-background:#10141F; --ui-surface:#1B2333; --ui-raised:#263249;
+  --ui-separator:#34425B; --ui-outline:#72829C;
+  --ui-text:#F4F7FF; --ui-muted:#B8C4D9;
+  --ui-primary:#A99CFF; --ui-primary-hover:#B9AEFF; --ui-primary-pressed:#8F80EB;
+  --ui-on-primary:#17152B; --ui-secondary:#65DFBD; --ui-on-secondary:#101A20;
+  --ui-accent:#FFC773; --ui-success:#65DFBD; --ui-warning:#FFC773; --ui-error:#FF9AA8;
+  --ui-disabled:#34425B; --ui-disabled-text:#92A0B8; --ui-scrim:#000000;
+  --course-grass:#246342; --course-wall:#172334; --course-wall-edge:#B8C4D9;
+  --course-water:#397EEB; --course-water-mark:#F4F7FF;
+  --course-sand:#D9BE85; --course-sand-mark:#493A22;
+  --course-belt:#39465F; --course-belt-mark:#F4F7FF; --course-portal:#BEA1FF;
+  --course-prop:#F0A45D; --course-prop-mark:#49301E; --course-star:#FFD76A;
+  --course-cup:#080D13; --course-ball-human:#F4F7FF;
+  --course-ball-bot:#10141F; --course-ball-bot-edge:#F4F7FF;
+  --ui-font:"Nunito Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --ui-font-fallback:system-ui,-apple-system,"Segoe UI",sans-serif;
+  --ui-font-mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --ui-weight-regular:400; --ui-weight-semibold:600; --ui-weight-bold:700; --ui-weight-heavy:800;
+  --ui-display:40px; --ui-display-line:48px; --ui-title:32px; --ui-title-line:40px;
+  --ui-heading:24px; --ui-heading-line:32px; --ui-body:16px; --ui-body-line:24px;
+  --ui-label:16px; --ui-label-line:20px; --ui-caption:14px; --ui-caption-line:20px;
+  --ui-numeric:24px; --ui-numeric-line:28px;
+  --ui-space-0:0px; --ui-space-1:4px; --ui-space-2:8px; --ui-space-3:12px;
+  --ui-space-4:16px; --ui-space-5:24px; --ui-space-6:32px;
+  --ui-space-7:40px; --ui-space-8:48px; --ui-space-9:64px;
+  --ui-radius-small:8px; --ui-radius-button:16px; --ui-radius-panel:24px; --ui-radius-pill:999px;
+  --ui-shadow-low:0 4px 12px rgb(0 0 0 / 20%);
+  --ui-shadow-high:0 12px 32px rgb(0 0 0 / 32%);
+  --ui-press:80ms; --ui-release:120ms; --ui-screen:180ms; --ui-modal:160ms; --ui-toast:140ms;
+  --ui-hint-dismiss:700ms; --ui-hole-squash:260ms;
+  --ui-ring-half-cycle:650ms; --ui-pointer-half-cycle:420ms;
+  --ui-scrim-alpha:.72; --ui-control-min:44px; --ui-sidebar:224px;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root { --ui-press:0ms; --ui-release:0ms; --ui-screen:0ms; --ui-modal:0ms; --ui-toast:0ms; }
+}
