@@ -1,0 +1,414 @@
+<title>Putt Duel Mechanics</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  /* Layout: one reading column, scorecard-style tables, three to-scale hole maps side by side. */
+  :root {
+    --bg: #F5F7F4;
+    --surface: #FFFFFF;
+    --fg: #16201A;
+    --muted: #566259;
+    --line: #D3DAD4;
+    --tint: #E7EFE8;
+    --accent: #1E7443;
+    --on-accent: #FFFFFF;
+    --map-court: #2F7F4A;
+    --map-belt: #43A163;
+    --map-wall: #1F2426;
+    --map-water: #2E86D6;
+    --map-sand: #DCC48E;
+    --map-portal: #C39BFF;
+    --map-prop: #F28C28;
+    --map-star: #FFD23F;
+    --map-cup: #0A0D0B;
+    --map-flag: #E5484D;
+    --map-mark: #FFFFFF;
+    --font-display: "Barlow Condensed", "Arial Narrow", Arial, sans-serif;
+    --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0F1411; --surface: #161C18; --fg: #E4EAE5; --muted: #98A59B; --line: #2A332D;
+      --tint: #1C251F; --accent: #58BD7C; --on-accent: #0C130E; --map-wall: #2C3336;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0F1411; --surface: #161C18; --fg: #E4EAE5; --muted: #98A59B; --line: #2A332D;
+    --tint: #1C251F; --accent: #58BD7C; --on-accent: #0C130E; --map-wall: #2C3336;
+    color-scheme: dark;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font: 15px/1.55 var(--font-body);
+    padding-block: 28px 64px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  .wrap { max-width: 880px; margin-inline: auto; display: grid; gap: 36px; }
+  .wrap > * { min-width: 0; }
+
+  header { display: grid; gap: 10px; }
+  .eyebrow { font: 500 12px/1.4 var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin: 0; }
+  h1 { font: 600 clamp(38px, 8vw, 58px)/0.98 var(--font-display); letter-spacing: 0.01em; text-transform: uppercase; margin: 0; text-wrap: balance; }
+  .lede { margin: 0; max-width: 62ch; color: var(--muted); }
+
+  section { border-top: 1px solid var(--line); padding-top: 18px; display: grid; gap: 14px; }
+  section > * { min-width: 0; }
+  h2 { font: 600 25px/1.1 var(--font-display); letter-spacing: 0.04em; text-transform: uppercase; margin: 0; }
+  h3 { font: 600 21px/1.1 var(--font-display); letter-spacing: 0.03em; text-transform: uppercase; margin: 0; }
+  p { margin: 0; max-width: 66ch; }
+  .note { color: var(--muted); font-size: 13.5px; }
+  ul { margin: 0; padding-left: 1.15em; display: grid; gap: 6px; max-width: 70ch; }
+  code { font: 0.9em var(--font-mono); background: var(--tint); padding: 1px 5px; border-radius: 3px; }
+  b { font-weight: 600; }
+  .n { font-family: var(--font-mono); font-size: 0.93em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  .scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { padding: 8px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+  thead th { font: 500 11.5px/1.3 var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); vertical-align: bottom; }
+  .num { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tbody th { font-weight: 500; }
+
+  /* The one loud element: a golf scorecard. */
+  .card { background: var(--surface); border: 1px solid var(--line); border-collapse: separate; border-spacing: 0; max-width: 560px; }
+  .narrow { max-width: 560px; }
+  .card th, .card td { text-align: center; border-right: 1px solid var(--line); }
+  .card th:last-child, .card td:last-child { border-right: 0; }
+  .card tr:last-child th, .card tr:last-child td { border-bottom: 0; }
+  .card thead th { background: var(--accent); color: var(--on-accent); font: 600 20px/1 var(--font-display); letter-spacing: 0.06em; padding-block: 9px; border-color: var(--accent); }
+  .card tbody th { text-align: left; font: 500 11.5px/1.3 var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+  .card thead th:first-child { text-align: left; }
+  .card .big { font: 600 26px/1 var(--font-display); }
+
+  dl { margin: 0; display: grid; grid-template-columns: minmax(140px, 190px) 1fr; border-top: 1px solid var(--line); }
+  dt, dd { margin: 0; padding: 10px 0; border-bottom: 1px solid var(--line); min-width: 0; }
+  dt { font-weight: 600; display: flex; gap: 9px; align-items: baseline; padding-right: 16px; }
+  dt svg { flex: none; width: 15px; height: 15px; position: relative; top: 2px; }
+  @media (max-width: 560px) {
+    dl { grid-template-columns: 1fr; }
+    dt { border-bottom: 0; padding-bottom: 0; }
+    dd { padding-top: 3px; }
+  }
+
+  .holes { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 28px 24px; }
+  figure { margin: 0; display: grid; gap: 10px; align-content: start; min-width: 0; }
+  figure svg { display: block; width: 100%; max-width: 330px; height: auto; }
+  figcaption { display: grid; gap: 6px; font-size: 14px; }
+  .meta { font: 500 12px/1.4 var(--font-mono); letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--muted); list-style: none; padding: 0; max-width: none; }
+  .legend li { display: inline-flex; gap: 7px; align-items: center; }
+  .legend svg { width: 15px; height: 15px; flex: none; }
+
+  .m-border, .m-wall { fill: var(--map-wall); }
+  .m-court { fill: var(--map-court); }
+  .m-belt { fill: var(--map-belt); }
+  .m-water { fill: var(--map-water); }
+  .m-sand { fill: var(--map-sand); }
+  .m-prop { fill: var(--map-prop); }
+  .m-star { fill: var(--map-star); }
+  .m-cup { fill: var(--map-cup); }
+  .m-flag { fill: var(--map-flag); }
+  .m-pole { stroke: var(--map-mark); stroke-width: 3; fill: none; }
+  .m-portal { fill: var(--map-cup); stroke: var(--map-portal); stroke-width: 5; }
+  .m-start { fill: none; stroke: var(--map-mark); stroke-width: 3; stroke-dasharray: 8 6; }
+  .m-chev { fill: none; stroke: var(--map-mark); stroke-opacity: 0.75; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+  .m-arrow { stroke: var(--map-mark); stroke-width: 3; fill: none; }
+  .m-arrowhead { fill: var(--map-mark); }
+  .m-label { fill: var(--map-mark); font: 600 19px var(--font-mono); }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">games/minigolf &middot; read from src/logic</p>
+    <h1>Putt Duel mechanics</h1>
+    <p class="lede">Every rule and number in the game, taken from the code and checked against the running physics. Distances are in course units (u). One unit is one pixel of the 400 &times; 560 court.</p>
+  </header>
+
+  <section aria-labelledby="s-match">
+    <h2 id="s-match">The match</h2>
+    <p>Match play against a bot over three holes. Each hole is worth one point. Most points after hole 3 wins. Equal points is a draw.</p>
+    <div class="scroll">
+      <table class="card">
+        <thead>
+          <tr><th scope="col">Hole</th><th scope="col">1</th><th scope="col">2</th><th scope="col">3</th></tr>
+        </thead>
+        <tbody>
+          <tr><th scope="row">Name</th><td>Open field</td><td>Portal pegs</td><td>Belt maze</td></tr>
+          <tr><th scope="row">Shot cap</th><td class="big">5</td><td class="big">4</td><td class="big">6</td></tr>
+          <tr><th scope="row">Shoots first</th><td>You</td><td>Bot</td><td>You</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="scroll">
+      <table class="narrow">
+        <thead>
+          <tr><th scope="col">How the hole ends</th><th scope="col" class="num">Winner</th><th scope="col" class="num">Other</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Both hole out, one in fewer shots</td><td class="num">1</td><td class="num">0</td></tr>
+          <tr><td>Both hole out in the same number of shots</td><td class="num">0</td><td class="num">0</td></tr>
+          <tr><td>One holes out, the other runs out of shots</td><td class="num">1</td><td class="num">0</td></tr>
+          <tr><td>Both run out of shots</td><td class="num">0</td><td class="num">0</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>You are out of a hole when your shot count reaches the cap and the ball is not in the cup. A star raises your cap by one for that hole.</p>
+  </section>
+
+  <section aria-labelledby="s-turn">
+    <h2 id="s-turn">A turn</h2>
+    <ul>
+      <li>Players alternate, one shot each. If the other player has already finished the hole, you keep shooting.</li>
+      <li>On your first turn you tap inside the start zone to place the ball, then shoot. Placing and the first shot are one turn.</li>
+      <li>A turn ends when the ball stops, drops into the cup, or has rolled for 12 seconds.</li>
+      <li>Both balls stay on the court. They never collide.</li>
+    </ul>
+    <p class="note">Phases in the match state: <code>placing</code> &rarr; <code>aiming</code> &rarr; <code>rolling</code> &rarr; <code>holeOver</code> &rarr; <code>matchOver</code>.</p>
+  </section>
+
+  <section aria-labelledby="s-aim">
+    <h2 id="s-aim">Aiming</h2>
+    <ul>
+      <li>Touch anywhere, drag, release. The ball goes the opposite way to the drag, like a slingshot.</li>
+      <li>Power is drag length divided by <span class="n">180 px</span>, capped at 100%. Releasing below 5% cancels the shot.</li>
+      <li>Launch speed is power &times; <span class="n">640 u/s</span>. The aim line is power &times; <span class="n">120 px</span> long.</li>
+    </ul>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col" class="num">Power</th><th scope="col" class="num">Drag</th><th scope="col" class="num">Launch speed</th>
+            <th scope="col" class="num">Roll on grass</th><th scope="col" class="num">Roll on sand</th><th scope="col" class="num">Time to stop</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="num">25%</td><td class="num">45 px</td><td class="num">160 u/s</td><td class="num">53 u</td><td class="num">11 u</td><td class="num">0.65 s</td></tr>
+          <tr><td class="num">50%</td><td class="num">90 px</td><td class="num">320 u/s</td><td class="num">213 u</td><td class="num">43 u</td><td class="num">1.32 s</td></tr>
+          <tr><td class="num">75%</td><td class="num">135 px</td><td class="num">480 u/s</td><td class="num">480 u</td><td class="num">96 u</td><td class="num">1.98 s</td></tr>
+          <tr><td class="num">100%</td><td class="num">180 px</td><td class="num">640 u/s</td><td class="num">853 u</td><td class="num">171 u</td><td class="num">2.65 s</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">Roll is the straight-line distance with nothing in the way, and time to stop is on grass. The court is 400 &times; 560 u, so a full-power shot always reaches a wall. Distance is speed&sup2; &divide; 480 on grass and speed&sup2; &divide; 2400 on sand.</p>
+  </section>
+
+  <section aria-labelledby="s-ball">
+    <h2 id="s-ball">The ball</h2>
+    <div class="scroll">
+      <table>
+        <tbody>
+          <tr><th scope="row">Simulation step</th><td class="num">1/120 s</td><td>Fixed. The same inputs always give the same result, to the last bit.</td></tr>
+          <tr><th scope="row">Ball radius</th><td class="num">8 u</td><td></td></tr>
+          <tr><th scope="row">Friction on grass</th><td class="num">240 u/s&sup2;</td><td>Constant slowdown, not a percentage.</td></tr>
+          <tr><th scope="row">Friction on sand</th><td class="num">1200 u/s&sup2;</td><td>Five times grass. Applies while the ball's centre is in the sand.</td></tr>
+          <tr><th scope="row">Wall bounce</th><td class="num">85%</td><td>Share of the speed into the wall that comes back. Speed along the wall is untouched.</td></tr>
+          <tr><th scope="row">Rest speed</th><td class="num">5 u/s</td><td>Below this the ball stops dead.</td></tr>
+          <tr><th scope="row">Roll limit</th><td class="num">12 s</td><td>A ball still moving is stopped where it is.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="s-hazards">
+    <h2 id="s-hazards">Hazards</h2>
+    <dl>
+      <dt><svg viewBox="0 0 16 16" aria-hidden="true"><rect class="m-wall" width="16" height="16"/></svg>Wall</dt>
+      <dd>Solid. The ball bounces off with 85% of its speed into the wall. The court edges behave the same way.</dd>
+
+      <dt><svg viewBox="0 0 16 16" aria-hidden="true"><rect class="m-sand" width="16" height="16"/></svg>Sand</dt>
+      <dd>Slows the ball at <span class="n">1200 u/s&sup2;</span>, five times grass. A full-power shot stops within <span class="n">171 u</span>.</dd>
+
+      <dt><svg viewBox="0 0 16 16" aria-hidden="true"><rect class="m-water" width="16" height="16"/></svg>Water</dt>
+      <dd>The ball goes back to where that shot started and stops. The shot still counts.</dd>
+
+      <dt><svg viewBox="0 0 16 16" aria-hidden="true"><rect class="m-belt" width="16" height="16"/><path class="m-chev" d="M4 6 L8 11 L12 6"/></svg>Conveyor</dt>
+      <dd>The belt moves at <span class="n">160 u/s</span> in the arrow direction. Friction pulls the ball toward belt speed, so a ball on a belt never rests. It rides at <span class="n">160 u/s</span> until it leaves. Going against a belt costs speed at the same rate as grass, but a ball that stalls is carried back.</dd>
+
+      <dt><svg viewBox="0 0 16 16" aria-hidden="true"><circle class="m-portal" cx="8" cy="8" r="5.5" style="stroke-width:3"/></svg>Portal</dt>
+      <dd>Radius <span class="n">14 u</span>. A ball that enters comes out <span class="n">23 u</span> in front of the paired portal at the same speed, heading in that portal's fixed exit direction whatever the entry angle. It cannot re-enter a portal until it has rolled clear.</dd>
+
+      <dt><svg viewBox="0 0 16 16" aria-hidden="true"><rect class="m-prop" y="4" width="16" height="8"/></svg>Breakable prop</dt>
+      <dd>The first hit bounces the ball with 50% of its speed into the prop. The prop is then gone for both players until the hole ends.</dd>
+
+      <dt><svg viewBox="0 0 24 24" aria-hidden="true"><polygon class="m-star" points="12,0 14.9,7.9 23.4,8.3 16.8,13.6 19.1,21.7 12,17 4.9,21.7 7.2,13.6 0.6,8.3 9.1,7.9"/></svg>Star</dt>
+      <dd>Radius <span class="n">12 u</span>. Rolling over it gives that player one extra shot on this hole. Once taken it is gone for both players.</dd>
+
+      <dt><svg viewBox="0 0 16 16" aria-hidden="true"><circle class="m-cup" cx="8" cy="8" r="7"/></svg>Cup</dt>
+      <dd>Radius <span class="n">11 u</span>. The ball drops when its centre is inside the cup and it is moving at <span class="n">260 u/s</span> or less, which is 41% of full power. A faster ball rolls straight over.</dd>
+    </dl>
+    <p class="note">Order of checks in each step: friction, move, walls and props, portal, water, star, cup, roll limit.</p>
+  </section>
+
+  <section aria-labelledby="s-holes">
+    <h2 id="s-holes">The three holes</h2>
+    <div class="holes">
+      <figure>
+        <svg viewBox="-8 -8 416 576" role="img" aria-label="Hole 1 map. Start zone bottom left, pond in the centre ringed by four props, cup in the top right corner behind an L-shaped wall.">
+          <rect class="m-border" x="-8" y="-8" width="416" height="576"/>
+          <rect class="m-court" x="0" y="0" width="400" height="560"/>
+          <rect class="m-water" x="120" y="210" width="160" height="130"/>
+          <rect class="m-wall" x="280" y="48" width="16" height="112"/>
+          <rect class="m-wall" x="280" y="144" width="120" height="16"/>
+          <rect class="m-prop" x="170" y="180" width="60" height="16"/>
+          <rect class="m-prop" x="170" y="354" width="60" height="16"/>
+          <rect class="m-prop" x="90" y="245" width="16" height="60"/>
+          <rect class="m-prop" x="294" y="245" width="16" height="60"/>
+          <rect class="m-start" x="24" y="472" width="64" height="64"/>
+          <circle class="m-cup" cx="348" cy="72" r="11"/>
+          <line class="m-pole" x1="348" y1="72" x2="348" y2="30"/>
+          <polygon class="m-flag" points="348,30 374,39 348,48"/>
+        </svg>
+        <figcaption>
+          <h3>1 &middot; Open field</h3>
+          <span class="meta">Cap 5 &middot; you shoot first</span>
+          <span>A 160 &times; 130 u pond fills the middle with four breakable props around it. The cup sits in the top-right pocket behind an L-shaped wall. The only way in is the 48 u gap between the top edge and the wall.</span>
+        </figcaption>
+      </figure>
+
+      <figure>
+        <svg viewBox="-8 -8 416 576" role="img" aria-label="Hole 2 map. Start zone, pond, sand and the entry portal in the bottom band. The exit portal at the top drops the ball onto a downward conveyor full of pegs, with the cup in a grass strip below it.">
+          <defs>
+            <pattern id="belt-h2-down" width="40" height="40" patternUnits="userSpaceOnUse"><path class="m-chev" d="M12 14 L20 24 L28 14"/></pattern>
+          </defs>
+          <rect class="m-border" x="-8" y="-8" width="416" height="576"/>
+          <rect class="m-court" x="0" y="0" width="400" height="560"/>
+          <rect class="m-belt" x="0" y="136" width="400" height="190"/>
+          <rect fill="url(#belt-h2-down)" x="0" y="136" width="400" height="190"/>
+          <rect class="m-sand" x="250" y="506" width="50" height="54"/>
+          <rect class="m-water" x="140" y="436" width="90" height="70"/>
+          <rect class="m-wall" x="0" y="120" width="120" height="16"/>
+          <rect class="m-wall" x="280" y="120" width="120" height="16"/>
+          <rect class="m-wall" x="0" y="404" width="400" height="16"/>
+          <rect class="m-wall" x="72" y="164" width="16" height="16"/>
+          <rect class="m-wall" x="152" y="164" width="16" height="16"/>
+          <rect class="m-wall" x="232" y="164" width="16" height="16"/>
+          <rect class="m-wall" x="312" y="164" width="16" height="16"/>
+          <rect class="m-wall" x="112" y="214" width="16" height="16"/>
+          <rect class="m-wall" x="192" y="214" width="16" height="16"/>
+          <rect class="m-wall" x="272" y="214" width="16" height="16"/>
+          <rect class="m-wall" x="72" y="264" width="16" height="16"/>
+          <rect class="m-wall" x="152" y="264" width="16" height="16"/>
+          <rect class="m-wall" x="232" y="264" width="16" height="16"/>
+          <rect class="m-wall" x="312" y="264" width="16" height="16"/>
+          <circle class="m-portal" cx="320" cy="530" r="14"/>
+          <text class="m-label" x="342" y="537">IN</text>
+          <circle class="m-portal" cx="172" cy="60" r="14"/>
+          <text class="m-label" x="194" y="67">OUT</text>
+          <line class="m-arrow" x1="172" y1="80" x2="172" y2="100"/>
+          <polygon class="m-arrowhead" points="165,98 179,98 172,110"/>
+          <rect class="m-start" x="24" y="476" width="64" height="64"/>
+          <circle class="m-cup" cx="200" cy="372" r="11"/>
+          <line class="m-pole" x1="200" y1="372" x2="200" y2="334"/>
+          <polygon class="m-flag" points="200,334 224,342 200,350"/>
+        </svg>
+        <figcaption>
+          <h3>2 &middot; Portal pegs</h3>
+          <span class="meta">Cap 4 &middot; bot shoots first</span>
+          <span>A solid wall seals the bottom band, so the portal on the right is the only way up. The lane under the pond is dry but ends in 50 u of sand before the portal. The ball comes out at the top heading straight down, and the belt pushes it through 11 pegs into the grass strip that holds the cup.</span>
+        </figcaption>
+      </figure>
+
+      <figure>
+        <svg viewBox="-8 -8 416 576" role="img" aria-label="Hole 3 map. Start zone at the bottom of a left corridor, a downward belt above it, then an upward belt, a rightward belt across the top with a star in the top right, and the cup inside a walled box in the centre.">
+          <defs>
+            <pattern id="belt-h3-right" width="40" height="40" patternUnits="userSpaceOnUse" patternTransform="rotate(-90)"><path class="m-chev" d="M12 14 L20 24 L28 14"/></pattern>
+            <pattern id="belt-h3-up" width="40" height="40" patternUnits="userSpaceOnUse" patternTransform="rotate(180)"><path class="m-chev" d="M12 14 L20 24 L28 14"/></pattern>
+            <pattern id="belt-h3-down" width="40" height="35" patternUnits="userSpaceOnUse"><path class="m-chev" d="M12 12 L20 22 L28 12"/></pattern>
+          </defs>
+          <rect class="m-border" x="-8" y="-8" width="416" height="576"/>
+          <rect class="m-court" x="0" y="0" width="400" height="560"/>
+          <rect class="m-belt" x="0" y="0" width="300" height="100"/>
+          <rect fill="url(#belt-h3-right)" x="0" y="0" width="300" height="100"/>
+          <rect class="m-belt" x="0" y="100" width="80" height="300"/>
+          <rect fill="url(#belt-h3-up)" x="0" y="100" width="80" height="300"/>
+          <rect class="m-belt" x="0" y="400" width="80" height="70"/>
+          <rect fill="url(#belt-h3-down)" x="0" y="400" width="80" height="70"/>
+          <rect class="m-belt" x="96" y="440" width="120" height="60"/>
+          <rect fill="url(#belt-h3-right)" x="96" y="440" width="120" height="60"/>
+          <line x1="0" y1="400" x2="80" y2="400" class="m-arrow" style="stroke-opacity:0.5;stroke-width:2"/>
+          <rect class="m-sand" x="170" y="250" width="30" height="88"/>
+          <rect class="m-wall" x="80" y="110" width="16" height="450"/>
+          <rect class="m-wall" x="158" y="250" width="12" height="100"/>
+          <rect class="m-wall" x="270" y="250" width="12" height="100"/>
+          <rect class="m-wall" x="158" y="338" width="124" height="12"/>
+          <polygon class="m-star" points="340,18 342.9,25.9 351.4,26.3 344.8,31.6 347.1,39.7 340,35 332.9,39.7 335.2,31.6 328.6,26.3 337.1,25.9"/>
+          <rect class="m-start" x="12" y="492" width="56" height="56"/>
+          <circle class="m-cup" cx="232" cy="300" r="11"/>
+          <line class="m-pole" x1="232" y1="300" x2="232" y2="264"/>
+          <polygon class="m-flag" points="232,264 256,272 232,280"/>
+        </svg>
+        <figcaption>
+          <h3>3 &middot; Belt maze</h3>
+          <span class="meta">Cap 6 &middot; you shoot first</span>
+          <span>From the middle of the start zone, a straight-up shot below 38% is pushed back by the down belt. At 38% or more (checked up to 60%) the belts carry the ball up the corridor, across the top and over the star, and it stops in the top-right corner. The cup is in the box in the middle, open at the top, with sand along its left side.</span>
+        </figcaption>
+      </figure>
+    </div>
+    <ul class="legend" aria-label="Map legend">
+      <li><svg viewBox="0 0 16 16" aria-hidden="true"><rect class="m-court" width="16" height="16"/><rect class="m-start" x="2" y="2" width="12" height="12" style="stroke-width:2;stroke-dasharray:3 2"/></svg>Start zone</li>
+      <li><svg viewBox="0 0 16 16" aria-hidden="true"><circle class="m-cup" cx="8" cy="8" r="7"/></svg>Cup</li>
+      <li><svg viewBox="0 0 16 16" aria-hidden="true"><rect class="m-wall" width="16" height="16"/></svg>Wall or peg</li>
+      <li><svg viewBox="0 0 16 16" aria-hidden="true"><rect class="m-water" width="16" height="16"/></svg>Water</li>
+      <li><svg viewBox="0 0 16 16" aria-hidden="true"><rect class="m-sand" width="16" height="16"/></svg>Sand</li>
+      <li><svg viewBox="0 0 16 16" aria-hidden="true"><rect class="m-belt" width="16" height="16"/><path class="m-chev" d="M4 6 L8 11 L12 6"/></svg>Conveyor, arrows show direction</li>
+      <li><svg viewBox="0 0 16 16" aria-hidden="true"><circle class="m-portal" cx="8" cy="8" r="5.5" style="stroke-width:3"/></svg>Portal</li>
+      <li><svg viewBox="0 0 16 16" aria-hidden="true"><rect class="m-prop" y="4" width="16" height="8"/></svg>Breakable prop</li>
+      <li><svg viewBox="0 0 24 24" aria-hidden="true"><polygon class="m-star" points="12,0 14.9,7.9 23.4,8.3 16.8,13.6 19.1,21.7 12,17 4.9,21.7 7.2,13.6 0.6,8.3 9.1,7.9"/></svg>Star</li>
+    </ul>
+    <p class="note">Maps are drawn to scale from the hole data files.</p>
+  </section>
+
+  <section aria-labelledby="s-bot">
+    <h2 id="s-bot">The bot</h2>
+    <p>The bot plays by the same physics as you. It has no hidden information and no speed or accuracy bonus. It picks a shot by trying many and keeping the best.</p>
+    <div class="scroll">
+      <table>
+        <tbody>
+          <tr><th scope="row">Shots tried per turn</th><td class="num">144</td><td>36 directions, one every 10&deg;, at four powers: 30%, 55%, 80% and 100%. Each is rolled to rest with the real physics.</td></tr>
+          <tr><th scope="row">Ranking</th><td class="num"></td><td>Holing out beats everything. Otherwise the shot that stops closest to the cup wins. Any shot that touches water ranks below every dry shot.</td></tr>
+          <tr><th scope="row">Placement</th><td class="num">3 spots</td><td>Centre, left-middle and right-middle of the start zone. It runs the full search from each and takes the best, 432 simulated shots.</td></tr>
+          <tr><th scope="row">Aim error</th><td class="num">&plusmn;3.6&deg;</td><td>Random nudge added to the chosen direction.</td></tr>
+          <tr><th scope="row">Power error</th><td class="num">&plusmn;3.75 pts</td><td>Random nudge added to the chosen power, kept between 5% and 100%.</td></tr>
+          <tr><th scope="row">Pacing</th><td class="num">0.6 s + 0.5 s</td><td>It waits, shows its aim line, then shoots.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <ul>
+      <li>It looks one shot ahead only. It does not plan two-shot routes.</li>
+      <li>The error sizes come from a skill setting of 0.75. At skill 1 there is no error. At skill 0 it is &plusmn;14.3&deg; and &plusmn;15 points.</li>
+      <li>The error uses a seeded random number stored in the match state. The same seed and the same player inputs replay the same match. Add <code>?seed=N</code> to the URL to set it.</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="s-save">
+    <h2 id="s-save">Saving</h2>
+    <p>The game stores wins, losses, draws, the mute setting and the match in progress in the browser under <code>minigolf:save</code>. It saves after every finished turn and at the end of each hole, never while a ball is rolling. The title screen shows the record and a Continue button when a match is in progress.</p>
+  </section>
+
+  <section aria-labelledby="s-out">
+    <h2 id="s-out">Not in the game</h2>
+    <p>Online play, two players on one phone, a turn timer, ball-to-ball collisions, more than three holes, camera movement, and anything involving real money.</p>
+  </section>
+
+  <section aria-labelledby="s-src">
+    <h2 id="s-src">Where each rule lives</h2>
+    <div class="scroll">
+      <table>
+        <thead><tr><th scope="col">File in games/minigolf/src/logic</th><th scope="col">Holds</th></tr></thead>
+        <tbody>
+          <tr><td><code>shot.ts</code></td><td>Drag to direction and power, launch speed.</td></tr>
+          <tr><td><code>physics.ts</code></td><td>The ball step, every hazard, all the constants above.</td></tr>
+          <tr><td><code>match.ts</code></td><td>Turns, shot caps, scoring, the match state.</td></tr>
+          <tr><td><code>opponent.ts</code></td><td>The opponent interface and the bot.</td></tr>
+          <tr><td><code>courses/hole1.ts</code>, <code>hole2.ts</code>, <code>hole3.ts</code></td><td>Hole layouts as plain data.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">All of it is plain TypeScript with no game-engine imports, so the rules are unit tested without a browser. For testing, <code>?hole=2</code> in the URL starts at that hole.</p>
+  </section>
+</div>

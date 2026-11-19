@@ -17,6 +17,12 @@ touch-only web app that can later be wrapped as an Android app.
 Each game has a `SPEC.md` (what it is) and a `TASKS.md` (the checklist it was
 built from), both written by the architect agent.
 
+**Putt Duel mechanics:** [`games/minigolf/MECHANICS.html`](games/minigolf/MECHANICS.html)
+lists every rule and number in the game, read from the code: scoring, aiming,
+ball physics, hazards, the three holes drawn to scale, and how the bot picks its
+shots. GitHub shows it as source. To read it rendered, open the file in a browser
+or visit `/minigolf/mechanics.html` on the deployed site.
+
 ## What is in here
 
 ```

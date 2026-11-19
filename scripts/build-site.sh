@@ -26,6 +26,17 @@ for dir in games/*/; do
   mkdir -p "site/$name"
   cp -R "$dir/dist/." "site/$name/"
   links+="<a href=\"./$name/\">$name</a>"
+  # A game's MECHANICS.html is a page body without a document shell; wrap it.
+  if [[ -f "$dir/MECHANICS.html" ]]; then
+    {
+      echo '<!doctype html><html lang="en"><head><meta charset="utf-8">'
+      echo '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">'
+      echo '<style>body{margin:0}</style></head><body>'
+      cat "$dir/MECHANICS.html"
+      echo '</body></html>'
+    } > "site/$name/mechanics.html"
+    links+="<a class=\"sub\" href=\"./$name/mechanics.html\">$name mechanics</a>"
+  fi
   count=$((count + 1))
 done
 
@@ -46,6 +57,7 @@ cat > site/index.html <<EOF
 body{font-family:sans-serif;background:#111;color:#eee;margin:0;padding:24px}
 a{display:block;padding:20px;margin:12px 0;background:#2563eb;color:#fff;border-radius:12px;
 text-decoration:none;font-size:22px;font-weight:bold;text-align:center;text-transform:capitalize}
+a.sub{background:none;border:1px solid #444;color:#ccc;font-size:15px;font-weight:normal;padding:12px;margin-top:-4px}
 p{color:#888;font-size:13px}
 </style>
 </head>
