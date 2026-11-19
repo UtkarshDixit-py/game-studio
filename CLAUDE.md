@@ -17,7 +17,8 @@ games/<name>/       one Phaser 3 + TypeScript + Vite game per folder, portrait 4
 scripts/            studio.sh (tmux cockpit), ship-task.sh (check + commit + push), board.sh
 .claude/agents/     architect.md, developer.md, tester.md
 .github/workflows/  ci.yml (check + e2e on every push), pages.yml (optional, manual only)
-vercel.json         live site config; scripts/build-site.sh assembles site/
+vercel.json         live site config; scripts/build-site.sh assembles site/,
+                    scripts/deploy-site.sh publishes it (run only when the human asks)
 ```
 
 Commands: `npm run check` (typecheck + unit tests + build all), `npm run e2e`

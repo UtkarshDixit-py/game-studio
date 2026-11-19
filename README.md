@@ -20,8 +20,8 @@ built from), both written by the architect agent.
 **Putt Duel mechanics:** [`games/minigolf/MECHANICS.html`](games/minigolf/MECHANICS.html)
 lists every rule and number in the game, read from the code: scoring, aiming,
 ball physics, hazards, the three holes drawn to scale, and how the bot picks its
-shots. GitHub shows it as source. To read it rendered, open the file in a browser
-or visit `/minigolf/mechanics.html` on the deployed site.
+shots. GitHub shows it as source; read it rendered at
+https://games-ten-steel.vercel.app/minigolf/mechanics.html.
 
 ## What is in here
 
@@ -29,7 +29,7 @@ or visit `/minigolf/mechanics.html` on the deployed site.
 packages/core/       @studio/core: bootstrap (FIT scaling, multi-touch), save data, maths, synth audio, BigButton
 games/minigolf/      Putt Duel
 games/botbrawl/      Bot Brawl skeleton
-scripts/             studio.sh (tmux cockpit), ship-task.sh, board.sh, build-site.sh
+scripts/             studio.sh (tmux cockpit), ship-task.sh, board.sh, build-site.sh, deploy-site.sh
 CLAUDE.md            instructions for the orchestrator agent
 .claude/agents/      architect, developer and tester agent definitions
 .github/workflows/   ci.yml (check + browser tests on every push), pages.yml (optional, manual)
@@ -69,11 +69,19 @@ hotspot instead.
 ```sh
 npm install --global vercel
 vercel login
-vercel deploy --prod --yes      # first run creates the project and prints the URL
+vercel link --yes               # once: creates or links the Vercel project
+scripts/deploy-site.sh          # builds locally, uploads the static site to production
 ```
 
-Connect the GitHub repo to the project in the Vercel dashboard to deploy on every
-push. Builds use `base: './'`, so the same output also works from a sub-folder on
+`scripts/deploy-site.sh` uploads only the built files, from a temporary folder
+outside the git repo. No source code goes to Vercel, and the deploy does not
+depend on Vercel matching the latest commit's author to your account, which
+blocks plain `vercel deploy` on the free plan when it cannot. Add `--preview` for
+a private preview deployment.
+
+Alternatively, connect the GitHub repo to the project in the Vercel dashboard to
+deploy on every push; `vercel.json` already holds the build settings for that.
+Builds use `base: './'`, so the same output also works from a sub-folder on
 any static host. `.github/workflows/pages.yml` is an optional GitHub Pages
 deploy, off by default; see the comment at the top of that file.
 
